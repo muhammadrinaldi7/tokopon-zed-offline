@@ -32,6 +32,8 @@ class CekStock extends Component
     public $showSnModal = false;
     public $modalWarehouseName = '';
     public $modalSns = [];
+    public $hasSnMismatch = false;
+    public $isSyncingSn = false;
 
     public function mount()
     {
@@ -257,6 +259,17 @@ class CekStock extends Component
                     ];
                 }
             }
+
+            // Deteksi selisih antara stok fisik tercatat dengan jumlah Serial Number (SN/IMEI) aktif
+            $this->hasSnMismatch = false;
+            if ($this->selectedProductHasSn) {
+                foreach ($this->stockData as $whData) {
+                    if ($whData['stock'] > count($whData['sns'])) {
+                        $this->hasSnMismatch = true;
+                        break;
+                    }
+                }
+            }
         } else {
             $this->stockData = [];
             $this->selectedProduct = '';
@@ -265,6 +278,8 @@ class CekStock extends Component
             $this->selectedProductCost = 0;
             $this->selectedProductHasSn = false;
             $this->selectedProductSku = '';
+            $this->hasSnMismatch = false;
+            $this->isSyncingSn = false;
             $this->dispatch('toast', title: 'Gagal', message: 'Data produk tidak ditemukan.', type: 'error');
         }
     }
@@ -282,6 +297,82 @@ class CekStock extends Component
         $this->selectedProductCost = 0;
         $this->selectedProductHasSn = false;
         $this->selectedProductSku = '';
+        $this->hasSnMismatch = false;
+        $this->isSyncingSn = false;
+    }
+
+    /**
+     * Sinkronisasi On-Demand Serial Number (SN/IMEI) langsung dari Accurate Online
+     * Berguna terutama pasca-transfer barang (Item Transfer) antar-gudang.
+     */
+    public function syncSnFromAccurate()
+    {
+        if (!$this->selectedProductSku) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Pilih produk terlebih dahulu sebelum melakukan sinkronisasi.', type: 'error');
+            return;
+        }
+
+        $this->isSyncingSn = true;
+
+        try {
+            $accurate = \App\Models\ProductAccurate::with('businessUnit')->find($this->selectedProductId);
+            $dbSource = $accurate?->businessUnit?->code ?? null;
+
+            /** @var \App\Services\SerialNumberSyncService $service */
+            $service = app(\App\Services\SerialNumberSyncService::class);
+            $snCount = $service->syncFromAccurate((string) $this->selectedProductSku, $dbSource);
+
+            // Perbarui stok per gudang pada tabel warehouse_stocks agar sinkron dengan jumlah SN aktif
+            if ($accurate && $this->selectedProductHasSn) {
+                $snCountsPerWh = \App\Models\ProductSerialNumber::where('item_no', $accurate->item_no)
+                    ->where('business_unit_id', $accurate->business_unit_id)
+                    ->where('status', 'Available')
+                    ->groupBy('warehouse_id')
+                    ->select('warehouse_id', \Illuminate\Support\Facades\DB::raw('count(*) as total'))
+                    ->pluck('total', 'warehouse_id');
+
+                foreach ($snCountsPerWh as $whId => $totalSn) {
+                    if ($whId) {
+                        \App\Models\WarehouseStock::updateOrCreate(
+                            [
+                                'warehouse_id' => $whId,
+                                'variant_id'   => $accurate->id,
+                                'variant_type' => get_class($accurate),
+                            ],
+                            [
+                                'stock' => (int) $totalSn,
+                            ]
+                        );
+                    }
+                }
+            }
+
+            // Muat ulang data stok & serial number yang baru saja disinkronkan
+            $this->selectProduct($this->selectedProductId, $this->selectedProductType);
+
+            if ($snCount > 0) {
+                $this->dispatch('toast', 
+                    title: 'Sinkronisasi Berhasil', 
+                    message: "Berhasil menyinkronkan {$snCount} Serial Number untuk SKU {$this->selectedProductSku} dari Accurate Online.", 
+                    type: 'success'
+                );
+            } else {
+                $this->dispatch('toast', 
+                    title: 'Sinkronisasi Selesai', 
+                    message: "Data Serial Number sudah sesuai dengan Accurate Online (tidak ditemukan nomor seri baru).", 
+                    type: 'info'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Manual Sync SN from CekStock failed for SKU {$this->selectedProductSku}: " . $e->getMessage());
+            $this->dispatch('toast', 
+                title: 'Gagal Sinkronisasi', 
+                message: 'Kendala saat menghubungi Accurate API: ' . $e->getMessage(), 
+                type: 'error'
+            );
+        } finally {
+            $this->isSyncingSn = false;
+        }
     }
 
     public function render()

@@ -62,6 +62,11 @@ class ItemQuantityHandler implements WebhookHandlerInterface
             : Warehouse::where('name', $warehouseName)->first();
 
         if (!$warehouse) {
+            // Abaikan pencatatan issue untuk gudang transit virtual internal Accurate Online ([AOL System] / Dalam Perjalanan)
+            if ($warehouseName && (str_contains($warehouseName, 'AOL System') || str_contains($warehouseName, 'Perjalanan'))) {
+                return false;
+            }
+
             \App\Services\SyncIssueRecorder::recordWarehouseNotFound(
                 warehouseName: $warehouseName,
                 itemNo: (string) $itemNo,

@@ -171,15 +171,32 @@
                                     @endcan
                                 </div>
                             </div>
-                            <button wire:click="resetCheck"
-                                class="p-2 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm transition"
-                                title="Tutup Pencarian">
-                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                            <div class="flex items-center gap-2">
+                                @if ($selectedProductHasSn)
+                                    <button wire:click="syncSnFromAccurate" wire:loading.attr="disabled" type="button"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 active:bg-white/40 text-white rounded-lg text-xs font-bold backdrop-blur-sm border border-white/20 shadow-sm transition-all disabled:opacity-50"
+                                        title="Tarik & Perbarui Nomor Seri (SN/IMEI) dari Accurate Online">
+                                        <svg wire:loading wire:target="syncSnFromAccurate" class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <svg wire:loading.remove wire:target="syncSnFromAccurate" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        <span wire:loading.remove wire:target="syncSnFromAccurate">Sync SN Accurate</span>
+                                        <span wire:loading wire:target="syncSnFromAccurate">Menyinkronkan...</span>
+                                    </button>
+                                @endif
+                                <button wire:click="resetCheck"
+                                    class="p-2 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm transition"
+                                    title="Tutup Pencarian">
+                                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <svg class="absolute -right-6 -bottom-6 w-32 h-32 text-white/10" fill="currentColor"
                             viewBox="0 0 24 24">
@@ -188,6 +205,28 @@
                             <path d="M12 12c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                         </svg>
                     </div>
+
+                    @if ($hasSnMismatch)
+                        <div class="px-6 py-3 bg-amber-50 border-b border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>
+                                    <strong>Perhatian:</strong> Terdapat selisih antara stok tercatat dengan rincian Serial Number (SN/IMEI). Kemungkinan dokumen transfer barang di Accurate baru saja diterima dan belum tersinkron ke POS.
+                                </span>
+                            </div>
+                            <button type="button" wire:click="syncSnFromAccurate" wire:loading.attr="disabled"
+                                class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold rounded-lg shadow-sm shrink-0 flex items-center justify-center gap-1.5 transition-colors">
+                                <svg wire:loading wire:target="syncSnFromAccurate" class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="syncSnFromAccurate">Sinkronkan SN Sekarang</span>
+                                <span wire:loading wire:target="syncSnFromAccurate">Sedang Sinkron...</span>
+                            </button>
+                        </div>
+                    @endif
 
                     <div class="p-6 bg-gray-50/50">
                         @if (count($stockData) > 0)
@@ -240,7 +279,17 @@
                                         {{-- GANTI DARI SINI: List Serial Number per Gudang ATAU Info Modal Non-SN --}}
                                         @if (!empty($data['sns']) && count($data['sns']) > 0)
                                             <div
-                                                class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex justify-end">
+                                                class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex items-center justify-between">
+                                                @if ($selectedProductHasSn && count($data['sns']) < $data['stock'])
+                                                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                                        <svg class="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        SN Parsial ({{ count($data['sns']) }}/{{ $data['stock'] }})
+                                                    </span>
+                                                @else
+                                                    <span></span>
+                                                @endif
                                                 <button
                                                     wire:click="openSnModal('{{ $data['warehouse_name'] }}', {{ json_encode($data['sns']) }})"
                                                     type="button"
@@ -256,7 +305,29 @@
                                                             stroke-width="2"
                                                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
-                                                    Cek SN
+                                                    Cek SN ({{ count($data['sns']) }})
+                                                </button>
+                                            </div>
+                                        @elseif($selectedProductHasSn && $data['stock'] > 0)
+                                            <div
+                                                class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex items-center justify-between text-xs">
+                                                <span class="text-amber-700 bg-amber-50 px-2 py-1 rounded text-[11px] font-semibold border border-amber-200 flex items-center gap-1">
+                                                    <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
+                                                    SN belum tersinkron
+                                                </span>
+                                                <button wire:click="syncSnFromAccurate" wire:loading.attr="disabled" type="button"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg text-amber-700 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 transition border border-amber-300 shadow-xs"
+                                                    title="Tarik SN untuk produk ini dari Accurate Online">
+                                                    <svg wire:loading.remove wire:target="syncSnFromAccurate" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    </svg>
+                                                    <svg wire:loading wire:target="syncSnFromAccurate" class="animate-spin w-3 h-3 text-amber-700" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span>Tarik SN</span>
                                                 </button>
                                             </div>
                                         @else

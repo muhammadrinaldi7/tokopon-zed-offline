@@ -188,17 +188,22 @@ class StockChangeHandler implements WebhookHandlerInterface
                             Log::info("Fast-Path SN Inbound: SN baru {$snString} berhasil dibuat di gudang '{$warehouse->name}' (Available).");
                         }
                     } else {
-                        \App\Services\SyncIssueRecorder::recordWarehouseNotFound(
-                            warehouseName: $warehouseName,
-                            itemNo: (string)$itemNo,
-                            databaseSource: $dbSource,
-                            log: $log,
-                            context: [
-                                'serial_number' => $snString,
-                                'transaction_number' => $transactionNumber,
-                                'transaction_type' => $transactionType
-                            ]
-                        );
+                        // Abaikan recordWarehouseNotFound jika ini gudang virtual transit AOL System
+                        if ($warehouseName && (str_contains($warehouseName, 'AOL System') || str_contains($warehouseName, 'Perjalanan'))) {
+                            Log::info("Fast-Path SN Transfer: SN {$snString} berada dalam transit/perjalanan di '{$warehouseName}'. Menunggu dokumen Terima Barang di Accurate.");
+                        } else {
+                            \App\Services\SyncIssueRecorder::recordWarehouseNotFound(
+                                warehouseName: $warehouseName,
+                                itemNo: (string)$itemNo,
+                                databaseSource: $dbSource,
+                                log: $log,
+                                context: [
+                                    'serial_number' => $snString,
+                                    'transaction_number' => $transactionNumber,
+                                    'transaction_type' => $transactionType
+                                ]
+                            );
+                        }
                     }
                 } 
                 // Skenario B: Mutasi Negatif (-1) karena Penjualan, Penyesuaian Keluar, atau Retur Pembelian
