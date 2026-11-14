@@ -13,6 +13,161 @@ use Illuminate\Support\Str;
 class BuybackSimulatorController extends Controller
 {
     /**
+     * Dapatkan opsi filter berjenjang (Brand -> Kategori -> Proyek/Seri -> Model)
+     * Persis seperti hierarki pemilihan di modul SellPhone Zoffline
+     */
+    public function getFilterOptions(Request $request): JsonResponse
+    {
+        $selectedBrand = trim((string) $request->input('brand', ''));
+        $selectedCategory = trim((string) $request->input('category', ''));
+        $selectedProyek = trim((string) $request->input('proyek', ''));
+        $searchQuery = trim((string) $request->input('q', ''));
+
+        // Base filter query untuk menyaring HP & Gadget, mengecualikan aksesoris/sparepart
+        $baseQuery = ProductAccurate::query()
+            ->where(function ($query) {
+                $query->whereNull('proyek')
+                    ->orWhereRaw("UPPER(proyek) NOT LIKE '%ACCESSORIES%'");
+            })
+            ->where(function ($catQuery) {
+                $catQuery->whereNull('categoryName')
+                    ->orWhere(function ($c) {
+                        $c->where('categoryName', 'not like', '%ANTI GORES%')
+                          ->where('categoryName', 'not like', '%AKSESORIS%')
+                          ->where('categoryName', 'not like', '%ACCESSORIES%')
+                          ->where('categoryName', 'not like', '%SPAREPART%')
+                          ->where('categoryName', 'not like', '%TEMPERED%')
+                          ->where('categoryName', 'not like', '%CASE%');
+                    });
+            })
+            ->where('name', 'not like', '%ANTI GORES%')
+            ->where('name', 'not like', '%3D TPG%')
+            ->where('name', 'not like', '%CASING%')
+            ->where('name', 'not like', '%CASE %')
+            ->where('name', 'not like', '%TEMPERED%')
+            ->where('name', 'not like', '%CHARGER%')
+            ->where('name', 'not like', '%KABEL%')
+            ->where('name', 'not like', '%ADAPTOR%')
+            ->where('name', 'not like', '%HEADSET%')
+            ->where('name', 'not like', '%EARPHONE%')
+            ->where('name', 'not like', '%TWS%');
+
+        // 1. Ambil daftar Brand aktif
+        $excludedBrandPatterns = [
+            'JETE', 'KIIP', 'OLIKE', 'OTHERS ACC', 'ROBOT', 'ROKER', 'VIVAN',
+            'UGREEN', 'ANKER', 'BASEUS', 'BMW', 'COSTUM', 'HIKARU', 'M2K',
+            'OASE', 'SULADA', 'TITON', 'X GUARD', 'MAGIC GLASS', 'NILLKIN',
+            'OEM', 'ICOLOR', 'OTHERS'
+        ];
+
+        $brandsRaw = (clone $baseQuery)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->selectRaw('UPPER(TRIM(brandName)) as brand_upper, MIN(brandName) as brand_display, count(*) as count')
+            ->groupBy('brand_upper')
+            ->orderBy('brand_upper')
+            ->get();
+
+        $brands = $brandsRaw
+            ->filter(function ($b) use ($excludedBrandPatterns) {
+                return !in_array($b->brand_upper, $excludedBrandPatterns);
+            })
+            ->map(function ($b) {
+                return [
+                    'id' => $b->brand_upper,
+                    'name' => $b->brand_display ?: $b->brand_upper,
+                    'item_count' => (int) $b->count,
+                ];
+            })
+            ->values();
+
+        // 2. Kategori jika Brand sudah dipilih
+        $categories = [];
+        if (!empty($selectedBrand)) {
+            $categories = (clone $baseQuery)
+                ->whereRaw('UPPER(TRIM(brandName)) = ?', [strtoupper($selectedBrand)])
+                ->whereNotNull('categoryName')
+                ->where('categoryName', '!=', '')
+                ->selectRaw('DISTINCT categoryName')
+                ->orderBy('categoryName')
+                ->pluck('categoryName')
+                ->values();
+        }
+
+        // 3. Proyek / Status / Seri jika Kategori sudah dipilih
+        $proyeks = [];
+        if (!empty($selectedBrand) && !empty($selectedCategory)) {
+            $proyeks = (clone $baseQuery)
+                ->whereRaw('UPPER(TRIM(brandName)) = ?', [strtoupper($selectedBrand)])
+                ->where('categoryName', $selectedCategory)
+                ->whereNotNull('proyek')
+                ->where('proyek', '!=', '')
+                ->selectRaw('DISTINCT proyek')
+                ->orderBy('proyek')
+                ->pluck('proyek')
+                ->values();
+        }
+
+        // 4. Daftar Model HP
+        $models = [];
+        if (!empty($selectedBrand) || !empty($searchQuery)) {
+            $modelQuery = (clone $baseQuery);
+
+            if (!empty($selectedBrand)) {
+                $modelQuery->whereRaw('UPPER(TRIM(brandName)) = ?', [strtoupper($selectedBrand)]);
+            }
+
+            if (!empty($selectedCategory)) {
+                $modelQuery->where('categoryName', $selectedCategory);
+            }
+
+            if (!empty($selectedProyek)) {
+                $modelQuery->where('proyek', $selectedProyek);
+            }
+
+            if (!empty($searchQuery)) {
+                $words = explode(' ', $searchQuery);
+                $modelQuery->where(function ($sub) use ($words) {
+                    foreach ($words as $w) {
+                        if (trim($w) !== '') {
+                            $sub->where('name', 'like', '%' . trim($w) . '%');
+                        }
+                    }
+                });
+            }
+
+            $models = $modelQuery
+                ->orderByRaw('CASE WHEN buy_price > 0 THEN 0 ELSE 1 END')
+                ->orderBy('name')
+                ->limit(60)
+                ->get()
+                ->map(function ($device) {
+                    $buyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : $device->base_price);
+                    $isOfficial = (float) ($device->buy_price ?? 0) > 0;
+                    return [
+                        'id' => $device->id,
+                        'name' => $device->name,
+                        'item_no' => $device->item_no,
+                        'brand' => $device->brandName ?: '-',
+                        'category' => $device->categoryName ?: '-',
+                        'proyek' => $device->proyek ?: '-',
+                        'buy_price' => $buyPrice,
+                        'is_official_buy_price' => $isOfficial,
+                        'formatted_price' => 'Rp ' . number_format($buyPrice, 0, ',', '.'),
+                    ];
+                })
+                ->values();
+        }
+
+        return response()->json([
+            'brands' => $brands,
+            'categories' => $categories,
+            'proyeks' => $proyeks,
+            'models' => $models,
+        ]);
+    }
+
+    /**
      * Cari perangkat HP untuk simulasi taksiran buyback CS
      */
     public function searchDevices(Request $request): JsonResponse

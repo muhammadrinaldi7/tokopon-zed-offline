@@ -113,6 +113,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
         Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
         Route::get('/chat/search-products', [\App\Http\Controllers\Crm\CsChatController::class, 'searchProducts'])->name('chat.search-products');
+        Route::get('/chat/buyback/filter-options', [\App\Http\Controllers\Crm\BuybackSimulatorController::class, 'getFilterOptions'])->name('chat.buyback.filters');
         Route::get('/chat/buyback/search-devices', [\App\Http\Controllers\Crm\BuybackSimulatorController::class, 'searchDevices'])->name('chat.buyback.search');
         Route::get('/chat/buyback/device-rules/{id}', [\App\Http\Controllers\Crm\BuybackSimulatorController::class, 'getDeviceRules'])->name('chat.buyback.rules');
         Route::get('/chat/poll-messages', [\App\Http\Controllers\Crm\CsChatController::class, 'pollMessages'])->name('chat.poll');
