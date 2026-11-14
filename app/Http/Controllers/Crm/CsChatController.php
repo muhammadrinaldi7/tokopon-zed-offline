@@ -415,6 +415,18 @@ class CsChatController extends Controller
                 ->toArray();
         }
 
+        // Format birthDate secara aman (karena bisa string, null, atau Carbon)
+        $birthDateFormatted = null;
+        if (!empty($profile?->birth_date)) {
+            try {
+                $birthDateFormatted = $profile->birth_date instanceof \DateTimeInterface
+                    ? $profile->birth_date->format('d M Y')
+                    : \Carbon\Carbon::parse($profile->birth_date)->format('d M Y');
+            } catch (\Throwable $e) {
+                $birthDateFormatted = (string) $profile->birth_date;
+            }
+        }
+
         return [
             'hasAccount' => !is_null($user),
             'fullName' => $profile?->full_name ?: ($user?->name ?: $conv->guest_name),
@@ -422,7 +434,7 @@ class CsChatController extends Controller
             'email' => $user?->email,
             'address' => $address ?: 'Belum diisi',
             'domisili' => $profile?->domisili,
-            'birthDate' => $profile?->birth_date?->format('d M Y'),
+            'birthDate' => $birthDateFormatted,
             'gender' => $profile?->gender,
             'loyalty' => [
                 'tier' => $loyalty?->tier ?? 'BRONZE',

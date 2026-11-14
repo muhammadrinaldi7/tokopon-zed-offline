@@ -8,6 +8,10 @@ class UserProfile extends Model
 {
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'birth_date' => 'date',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
