@@ -19,7 +19,8 @@ import {
     FileText,
     MessageCircle,
     X,
-    Loader2
+    Loader2,
+    Calculator
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -31,6 +32,7 @@ export default function ChatStream({
     onOpenClosingModal,
     onOpenVoucherModal,
     onOpenProductPicker,
+    onOpenBuybackModal,
     onClaimToggle,
     selectedProduct,
     onRemoveProduct,
@@ -442,6 +444,16 @@ export default function ChatStream({
                         title="Beri Kupon Diskon Closing"
                     >
                         <Ticket className="w-4 h-4 text-amber-500" />
+                    </button>
+
+                    {/* Button Simulasi Buyback / Taksir HP */}
+                    <button
+                        type="button"
+                        onClick={onOpenBuybackModal}
+                        className="p-2.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-slate-200 shadow-2xs"
+                        title="Simulasi Taksiran Buyback / Tukar Tambah HP"
+                    >
+                        <Calculator className="w-4 h-4 text-emerald-600" />
                     </button>
 
                     {/* Button Upload Foto */}

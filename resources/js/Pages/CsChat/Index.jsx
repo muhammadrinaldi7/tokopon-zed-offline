@@ -7,6 +7,7 @@ import Customer360Drawer from './Components/Customer360Drawer';
 import QuickVoucherModal from './Components/QuickVoucherModal';
 import ClosingModal from './Components/ClosingModal';
 import ProductPickerModal from './Components/ProductPickerModal';
+import BuybackSimulatorModal from './Components/BuybackSimulatorModal';
 import axios from 'axios';
 
 export default function CsChatIndex({
@@ -33,6 +34,7 @@ export default function CsChatIndex({
     const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
     const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
     const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+    const [isBuybackModalOpen, setIsBuybackModalOpen] = useState(false);
 
     // Sync state when props change (e.g. from server page reload or router.get)
     useEffect(() => {
@@ -342,6 +344,7 @@ export default function CsChatIndex({
                         onOpenClosingModal={() => setIsClosingModalOpen(true)}
                         onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
                         onOpenProductPicker={() => setIsProductPickerOpen(true)}
+                        onOpenBuybackModal={() => setIsBuybackModalOpen(true)}
                         onClaimToggle={handleClaimToggle}
                         selectedProduct={selectedProduct}
                         onRemoveProduct={() => setSelectedProduct(null)}
@@ -394,6 +397,27 @@ export default function CsChatIndex({
                     onSelectProduct={(product) => {
                         setSelectedProduct(product);
                         setIsProductPickerOpen(false);
+                    }}
+                />
+
+                {/* 7. Buyback & Trade-In Simulator Modal */}
+                <BuybackSimulatorModal
+                    isOpen={isBuybackModalOpen}
+                    onClose={() => setIsBuybackModalOpen(false)}
+                    onSendEstimateText={(text) => {
+                        if (!activeConv?.id) return;
+                        axios
+                            .post(`/crm/chat/${activeConv.id}/send`, {
+                                message: text,
+                            })
+                            .then((res) => {
+                                if (res.data?.success && res.data.message) {
+                                    handleNewMessageSent(res.data.message);
+                                }
+                            })
+                            .catch((err) => {
+                                console.error('Gagal mengirim estimasi buyback:', err);
+                            });
                     }}
                 />
             </div>
