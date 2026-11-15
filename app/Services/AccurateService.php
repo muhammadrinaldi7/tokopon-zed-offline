@@ -2039,28 +2039,10 @@ class AccurateService
 
         // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
         $order = $claim->warranty->orderItem->order ?? null;
-
-        // 1. Ambil Data Referensi dari Database
-        // Cek apakah invoice asli menggunakan pembayaran Finance
-        $financePayment = null;
-        if ($order) {
-            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
-                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
-            });
-        }
-
-        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
-        if ($financePayment) {
-            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
-            $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
-        } else {
-            // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
-            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
-            $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
-        }
         $originalInvoiceNo = null;
 
-        // Periksa apakah unit ini pernah diganti sebelumnya (Replacement beruntun)
+        // 1. Tentukan Faktur Penjualan (Sales Invoice) yang akan diretur
+        // Periksa apakah unit ini pernah diganti sebelumnya (Replacement beruntun / re-return)
         // Jika ya, gunakan invoice dari penggantian terakhir (Order: WR-xxx)
         $previousClaims = $claim->warranty->claims()
             ->where('id', '!=', $claim->id)
@@ -2091,6 +2073,60 @@ class AccurateService
         // Jika tidak ada, jangan paksakan hit API agar tidak error berantakan.
         if (!$originalInvoiceNo) {
             throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan/unit ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
+        }
+
+        // 2. Tentukan Customer No yang WAJIB sama persis dengan Faktur Penjualan di Accurate
+        // Cek apakah invoice asli menggunakan pembayaran Finance
+        $financePayment = null;
+        if ($order) {
+            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+            });
+
+            // Jika order saat ini adalah order pengganti (WR-xxx), telusuri ke order asli untuk mencari pembayaran finance
+            if (!$financePayment && str_starts_with($order->order_number, 'WR-')) {
+                $originalSerial = $claim->warranty->serialLogs()->orderBy('id', 'asc')->value('old_serial_number') 
+                    ?: $claim->warranty->serial_number;
+                
+                $rootOrder = \App\Models\Order::whereHas('orderItems', function ($q) use ($originalSerial) {
+                        $q->where('serial_number', $originalSerial);
+                    })
+                    ->where('order_number', 'not like', 'WR-%')
+                    ->first();
+
+                if ($rootOrder) {
+                    $financePayment = $rootOrder->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                        return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+                    });
+                }
+            }
+        }
+
+        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+        if ($financePayment) {
+            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+            $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
+        } else {
+            // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
+            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+            $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
+        }
+
+        // PRIORITAS UTAMA & ANTI-GAGAL:
+        // Selalu samakan customerNo langsung dengan yang terdaftar di Faktur Penjualan Accurate ($originalInvoiceNo).
+        // Accurate Online mewajibkan: Pelanggan pada Retur dan Faktur HARUS SAMA PERSIS.
+        try {
+            $liveInvoice = $this->getSalesInvoiceDetail($originalInvoiceNo, $businessUnitCode);
+            if ($liveInvoice) {
+                $invoiceCustomerNo = $liveInvoice['customer']['customerNo'] ?? ($liveInvoice['customerNo'] ?? null);
+                if (!empty($invoiceCustomerNo)) {
+                    $customerNo = $invoiceCustomerNo;
+                    $customerName = $liveInvoice['customer']['name'] ?? ($liveInvoice['customerName'] ?? $customerName);
+                    Log::info("Warranty Replacement: Menggunakan customerNo '{$customerNo}' ({$customerName}) langsung dari Faktur Accurate {$originalInvoiceNo}");
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Gagal fetch detail live invoice {$originalInvoiceNo} dari Accurate (menggunakan fallback lokal): " . $e->getMessage());
         }
 
         // Ambil Item No (SKU) dari unit yang diretur
@@ -2846,6 +2882,21 @@ class AccurateService
             // Fallback (seharusnya tidak pernah terjadi jika data valid)
             $fallbackOrder = $claim->warranty->orderItem->order ?? null;
             $originalInvoiceNo = $fallbackOrder->accurate_invoice_no ?? $fallbackOrder->order_number ?? 'INV-UNKNOWN';
+        }
+
+        // Selalu samakan customerNo langsung dengan yang terdaftar di Faktur Penjualan Accurate jika memungkinkan
+        try {
+            if ($originalInvoiceNo && $originalInvoiceNo !== 'INV-UNKNOWN') {
+                $liveInvoice = $this->getSalesInvoiceDetail($originalInvoiceNo, $businessUnitCode);
+                if ($liveInvoice) {
+                    $invoiceCustomerNo = $liveInvoice['customer']['customerNo'] ?? ($liveInvoice['customerNo'] ?? null);
+                    if (!empty($invoiceCustomerNo)) {
+                        $customerNo = $invoiceCustomerNo;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Gagal fetch detail live invoice {$originalInvoiceNo} untuk downgrade refund: " . $e->getMessage());
         }
 
         // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang
