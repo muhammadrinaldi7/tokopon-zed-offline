@@ -2076,41 +2076,8 @@ class AccurateService
         }
 
         // 2. Tentukan Customer No yang WAJIB sama persis dengan Faktur Penjualan di Accurate
-        // Cek apakah invoice asli menggunakan pembayaran Finance
-        $financePayment = null;
-        if ($order) {
-            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
-                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
-            });
-
-            // Jika order saat ini adalah order pengganti (WR-xxx), telusuri ke order asli untuk mencari pembayaran finance
-            if (!$financePayment && str_starts_with($order->order_number, 'WR-')) {
-                $originalSerial = $claim->warranty->serialLogs()->orderBy('id', 'asc')->value('old_serial_number') 
-                    ?: $claim->warranty->serial_number;
-                
-                $rootOrder = \App\Models\Order::whereHas('orderItems', function ($q) use ($originalSerial) {
-                        $q->where('serial_number', $originalSerial);
-                    })
-                    ->where('order_number', 'not like', 'WR-%')
-                    ->first();
-
-                if ($rootOrder) {
-                    $financePayment = $rootOrder->payments()->with('paymentMethod')->get()->first(function ($payment) {
-                        return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
-                    });
-                }
-            }
-        }
-
-        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
-        if ($financePayment) {
-            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
-            $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
-        } else {
-            // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
-            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
-            $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
-        }
+        $customerNo = null;
+        $customerName = null;
 
         // PRIORITAS UTAMA & ANTI-GAGAL:
         // Selalu samakan customerNo langsung dengan yang terdaftar di Faktur Penjualan Accurate ($originalInvoiceNo).
@@ -2121,12 +2088,50 @@ class AccurateService
                 $invoiceCustomerNo = $liveInvoice['customer']['customerNo'] ?? ($liveInvoice['customerNo'] ?? null);
                 if (!empty($invoiceCustomerNo)) {
                     $customerNo = $invoiceCustomerNo;
-                    $customerName = $liveInvoice['customer']['name'] ?? ($liveInvoice['customerName'] ?? $customerName);
+                    $customerName = $liveInvoice['customer']['name'] ?? ($liveInvoice['customerName'] ?? 'Customer Accurate');
                     Log::info("Warranty Replacement: Menggunakan customerNo '{$customerNo}' ({$customerName}) langsung dari Faktur Accurate {$originalInvoiceNo}");
                 }
             }
         } catch (\Throwable $e) {
             Log::warning("Gagal fetch detail live invoice {$originalInvoiceNo} dari Accurate (menggunakan fallback lokal): " . $e->getMessage());
+        }
+
+        // FALLBACK LOKAL: Jika gagal fetch detail faktur dari Accurate API
+        if (!$customerNo) {
+            $financePayment = null;
+            if ($order) {
+                $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                    return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+                });
+
+                // Jika order saat ini adalah order pengganti (WR-xxx), telusuri ke order asli untuk mencari pembayaran finance
+                if (!$financePayment && str_starts_with($order->order_number, 'WR-')) {
+                    $originalSerial = $claim->warranty->serialLogs()->orderBy('id', 'asc')->value('old_serial_number') 
+                        ?: $claim->warranty->serial_number;
+                    
+                    $rootOrder = \App\Models\Order::whereHas('items', function ($q) use ($originalSerial) {
+                            $q->where('serial_number', $originalSerial);
+                        })
+                        ->where('order_number', 'not like', 'WR-%')
+                        ->first();
+
+                    if ($rootOrder) {
+                        $financePayment = $rootOrder->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                            return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+                        });
+                    }
+                }
+            }
+
+            // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+            if ($financePayment) {
+                $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+                $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
+            } else {
+                // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
+                $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+                $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
+            }
         }
 
         // Ambil Item No (SKU) dari unit yang diretur

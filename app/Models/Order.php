@@ -103,6 +103,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function orderItems()
+    {
+        return $this->items();
+    }
+
     public function payments()
     {
         // hasMany karena user bisa saja mencoba bayar berulang kali jika gagal
