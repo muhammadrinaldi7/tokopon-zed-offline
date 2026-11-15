@@ -35,6 +35,9 @@ class OrderCancellationHandler implements ApprovalHandlerInterface
         // Update local order status
         $order->update(['order_status' => 'CANCELLED']);
 
+        // Hapus settlement tunai jika sebelumnya sempat di-settle
+        $order->cashSettlement()?->delete();
+
         // Load items, promos, and handledBy user
         $order->loadMissing(['items.promos', 'handledBy']);
 

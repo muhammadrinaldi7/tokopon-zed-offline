@@ -232,6 +232,7 @@ class ResetToDraft extends Component
 
             // 4. Hapus semua payment terkait order ini
             $order->payments()->delete();
+            $order->cashSettlement()?->delete();
 
             \Illuminate\Support\Facades\DB::commit();
 

@@ -35,6 +35,11 @@ class MonitoringKasir extends Component
         if (!$this->selectedKasirId) return;
 
         $query = Order::with(['payments.paymentMethod', 'cashSettlement.monitoringBy'])
+            ->whereNotIn('order_status', ['CANCELLED', 'cancelled', 'DELETED', 'deleted', 'DRAFT', 'draft'])
+            ->whereDoesntHave('approvalRequests', function ($q) {
+                $q->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
+                  ->where('status', 'PENDING');
+            })
             ->whereHas('payments.paymentMethod', function ($q) {
                 $q->where('name', 'like', '%TUNAI%')
                   ->orWhere('name', 'like', '%CASH%')
@@ -123,6 +128,11 @@ class MonitoringKasir extends Component
         $branchName = Auth::user()->branch->name ?? 'Semua Cabang';
 
         $query = Order::with(['handledBy', 'payments.paymentMethod', 'cashSettlement'])
+            ->whereNotIn('order_status', ['CANCELLED', 'cancelled', 'DELETED', 'deleted', 'DRAFT', 'draft'])
+            ->whereDoesntHave('approvalRequests', function ($q) {
+                $q->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
+                  ->where('status', 'PENDING');
+            })
             ->whereHas('payments.paymentMethod', function ($q) {
                 $q->where('name', 'like', '%TUNAI%')
                   ->orWhere('name', 'like', '%CASH%')

@@ -24,6 +24,7 @@ class MonitoringKasirExport implements FromQuery, WithHeadings, WithMapping, Sho
         $query = OrderCashSettlement::query()
             ->select('order_cash_settlements.*')
             ->join('orders', 'order_cash_settlements.order_id', '=', 'orders.id')
+            ->whereNotIn('orders.order_status', ['CANCELLED', 'cancelled', 'DELETED', 'deleted', 'DRAFT', 'draft'])
             ->whereDate('order_cash_settlements.created_at', '>=', $this->filters['startDate'])
             ->whereDate('order_cash_settlements.created_at', '<=', $this->filters['endDate']);
 
