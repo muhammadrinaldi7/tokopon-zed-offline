@@ -483,7 +483,7 @@
                 </span>
                 <div>
                     <h4 class="text-sm font-bold text-gray-800">Opsi Sinkronisasi Massal & Terminal Log (Lanjutan)</h4>
-                    <p class="text-xs text-gray-400 mt-0.5">Tarik saldo SN seluruh katalog, pemindaian massal arsip Receive Item, atau pantau log proses.</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Penarikan arsip menyeluruh, proses latar belakang, dan riwayat log proses.</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -500,10 +500,20 @@
         </button>
 
         <div x-show="open" x-transition class="p-6 space-y-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
+                <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <span class="font-bold">Panduan Operasional:</span> Untuk kebutuhan harian, gunakan tombol <b class="text-emerald-700">Tarik Dokumen RI</b> atau <b class="text-[#1c69d4]">Sinkron HPP Terfilter</b> di header atas agar proses cepat dan tepat sasaran. Tombol di bawah ini digunakan untuk pemindaian menyeluruh ke seluruh basis data Accurate.
+                </div>
+            </div>
+
             <div class="flex flex-wrap items-center gap-3">
                 <button wire:click="startSync"
                     @if($isSyncing || $isSyncingVendor || $isSyncingHpp) disabled @endif
-                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-900 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                    wire:confirm="Tindakan ini akan memindai saldo serial number untuk SELURUH katalog produk di sistem. Lanjutkan?"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-900 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer">
                     @if($isSyncing)
                         <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -511,13 +521,14 @@
                         </svg>
                         Sinkron Saldo SN...
                     @else
-                        Mulai Sinkronisasi Saldo SN (Per SKU)
+                        Mulai Sinkronisasi Saldo SN (Seluruh Katalog)
                     @endif
                 </button>
 
                 <button wire:click="startSyncVendor"
                     @if($isSyncing || $isSyncingVendor || $isSyncingHpp) disabled @endif
-                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                    wire:confirm="Tindakan ini akan memindai SELURUH dokumen Receive Item di Accurate dari arsip awal. Lanjutkan?"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer">
                     @if($isSyncingVendor)
                         <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -525,13 +536,14 @@
                         </svg>
                         Sinkron Seluruh Receive Item...
                     @else
-                        Pindai Seluruh Arsip Receive Item
+                        Pindai Seluruh Arsip Receive Item (Arsip Lama)
                     @endif
                 </button>
 
                 <button wire:click="startSyncHpp"
                     @if($isSyncing || $isSyncingVendor || $isSyncingHpp) disabled @endif
-                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                    wire:confirm="Tindakan ini akan memindai HPP untuk SEMUA item ber-SN yang masih Rp 0 di seluruh database (tanpa filter gudang). Lanjutkan?"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer">
                     @if($isSyncingHpp)
                         <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -539,7 +551,7 @@
                         </svg>
                         Get HPP Semua Item...
                     @else
-                        Get HPP Semua Item (Nearest Cost)
+                        Get HPP Semua Item (Global Tanpa Filter)
                     @endif
                 </button>
             </div>
@@ -588,11 +600,13 @@
     {{-- MODAL 1: Tarik Dokumen Penerimaan Barang (Receive Item) --}}
     @if($showDocModal)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-xs transition-opacity" wire:click="closeDocModal"></div>
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            {{-- Backdrop Overlay --}}
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" wire:click="closeDocModal"></div>
 
-                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100 p-6 space-y-6">
+            {{-- Centering Container --}}
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                {{-- Modal Card --}}
+                <div class="relative z-10 transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg p-6 space-y-6 border border-gray-100">
                     <div class="flex items-center justify-between border-b border-gray-100 pb-4">
                         <div class="flex items-center gap-2">
                             <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -605,7 +619,7 @@
                                 <p class="text-xs text-gray-500">Sinkronkan Vendor & HPP langsung dari dokumen Accurate</p>
                             </div>
                         </div>
-                        <button type="button" wire:click="closeDocModal" class="text-gray-400 hover:text-gray-600 p-1">
+                        <button type="button" wire:click="closeDocModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -616,7 +630,7 @@
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Unit Usaha (Database Source):</label>
                         <select wire:model="docBusinessUnitId"
-                            class="w-full text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-emerald-500">
+                            class="w-full text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer">
                             @foreach($businessUnits as $bu)
                                 <option value="{{ $bu->id }}">{{ $bu->name }} ({{ $bu->code }})</option>
                             @endforeach
@@ -638,7 +652,7 @@
                                 class="flex-1 text-xs font-mono bg-white border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500">
                             <button type="button" wire:click="syncSpecificDoc"
                                 wire:loading.attr="disabled"
-                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm disabled:opacity-50">
+                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm disabled:opacity-50 cursor-pointer">
                                 Proses Dokumen
                             </button>
                         </div>
@@ -656,7 +670,7 @@
                         <div class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-medium text-gray-600">Ambil:</span>
-                                <select wire:model="recentDocsLimit" class="text-xs font-bold bg-white border border-gray-200 rounded-lg py-1 px-2">
+                                <select wire:model="recentDocsLimit" class="text-xs font-bold bg-white border border-gray-200 rounded-lg py-1 px-2 cursor-pointer">
                                     <option value="15">15 Dokumen Terakhir</option>
                                     <option value="25">25 Dokumen Terakhir</option>
                                     <option value="50">50 Dokumen Terakhir</option>
@@ -664,7 +678,7 @@
                             </div>
                             <button type="button" wire:click="syncRecentDocs"
                                 wire:loading.attr="disabled"
-                                class="px-4 py-2 bg-[#1c69d4] hover:bg-[#1556b0] active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm disabled:opacity-50">
+                                class="px-4 py-2 bg-[#1c69d4] hover:bg-[#1556b0] active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm disabled:opacity-50 cursor-pointer">
                                 Tarik Dokumen Terbaru
                             </button>
                         </div>
@@ -674,20 +688,22 @@
         </div>
     @endif
 
-    {{-- MODAL 2: Edit Manual Vendor & HPP --}}
+    {{-- MODAL 2: Edit Manual Vendor & HPP Serial Number --}}
     @if($showEditModal)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-xs transition-opacity" wire:click="closeEditModal"></div>
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            {{-- Backdrop Overlay --}}
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" wire:click="closeEditModal"></div>
 
-                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-gray-100 p-6 space-y-5">
+            {{-- Centering Container --}}
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                {{-- Modal Card --}}
+                <div class="relative z-10 transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md p-6 space-y-5 border border-gray-100">
                     <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                         <div>
                             <h3 class="text-base font-black text-gray-900">Edit Vendor & HPP Serial Number</h3>
                             <p class="text-xs font-mono text-[#1c69d4] mt-0.5">{{ $editingSnNumber }}</p>
                         </div>
-                        <button type="button" wire:click="closeEditModal" class="text-gray-400 hover:text-gray-600">
+                        <button type="button" wire:click="closeEditModal" class="text-gray-400 hover:text-gray-600 cursor-pointer">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -704,7 +720,7 @@
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Vendor:</label>
                             <select wire:model="editVendorId"
-                                class="w-full text-xs font-medium bg-white border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-[#1c69d4]">
+                                class="w-full text-xs font-medium bg-white border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-[#1c69d4] cursor-pointer">
                                 <option value="">-- Pilih Vendor --</option>
                                 @foreach($vendors as $vnd)
                                     <option value="{{ $vnd->id }}">{{ $vnd->vendor_name }} ({{ $vnd->vendor_no }})</option>
@@ -733,11 +749,11 @@
 
                     <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
                         <button type="button" wire:click="closeEditModal"
-                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs transition-colors">
+                            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer">
                             Batal
                         </button>
                         <button type="button" wire:click="saveManualEdit"
-                            class="px-5 py-2 bg-[#1c69d4] hover:bg-[#1556b0] active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-sm">
+                            class="px-5 py-2 bg-[#1c69d4] hover:bg-[#1556b0] active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-sm cursor-pointer">
                             Simpan Perubahan
                         </button>
                     </div>
@@ -749,11 +765,13 @@
     {{-- MODAL 3: Edit Manual HPP & Vendor Produk Non-SN --}}
     @if($showNonSnEditModal)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-xs transition-opacity" wire:click="closeNonSnEditModal"></div>
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            {{-- Backdrop Overlay --}}
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" wire:click="closeNonSnEditModal"></div>
 
-                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-gray-100 p-6 space-y-5">
+            {{-- Centering Container --}}
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                {{-- Modal Card --}}
+                <div class="relative z-10 transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-gray-100 p-6 space-y-5">
                     <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                         <div>
                             <h3 class="text-base font-black text-gray-900">Edit HPP & Vendor Non-SN</h3>
