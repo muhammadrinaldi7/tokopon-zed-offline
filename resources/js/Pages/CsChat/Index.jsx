@@ -107,7 +107,9 @@ export default function CsChatIndex({
                     const msgText = e.message || '';
                     const msgTime = e.time || '';
                     const exists = prev.some(
-                        (m) => (e.id && m.id === e.id) || (m.time === msgTime && (m.text === msgText || m.message === msgText))
+                        (m) =>
+                            (e.id && m.id && parseInt(m.id) === parseInt(e.id)) ||
+                            (msgTime && m.time === msgTime && (m.text === msgText || m.message === msgText))
                     );
                     if (exists) return prev;
 
@@ -169,7 +171,9 @@ export default function CsChatIndex({
                     const msgText = e.message || e.text || '';
                     const msgTime = e.time || '';
                     const exists = prev.some(
-                        (m) => (e.id && m.id === e.id) || (m.time === msgTime && (m.text === msgText || m.message === msgText))
+                        (m) =>
+                            (e.id && m.id && parseInt(m.id) === parseInt(e.id)) ||
+                            (msgTime && m.time === msgTime && (m.text === msgText || m.message === msgText))
                     );
                     if (exists) return prev;
 
@@ -298,16 +302,39 @@ export default function CsChatIndex({
 
     // Callback saat pesan baru berhasil terkirim via ChatStream
     const handleNewMessageSent = (sentMsg) => {
-        // Tambahkan ke messages
-        setActiveMessages((prev) => [...prev, sentMsg]);
+        const msgText = sentMsg.text || sentMsg.message || '';
+        const msgTime = sentMsg.time || sentMsg.created_at || '';
+
+        // Tambahkan ke messages dengan proteksi deduplikasi (cegah double bubble)
+        setActiveMessages((prev) => {
+            const exists = prev.some(
+                (m) =>
+                    (sentMsg.id && m.id && parseInt(m.id) === parseInt(sentMsg.id)) ||
+                    (msgTime && m.time === msgTime && (m.text === msgText || m.message === msgText))
+            );
+            if (exists) return prev;
+
+            return [
+                ...prev,
+                {
+                    ...sentMsg,
+                    id: sentMsg.id,
+                    text: msgText,
+                    message: msgText,
+                    time: msgTime,
+                    created_at: msgTime,
+                    isCs: true,
+                },
+            ];
+        });
 
         // Update preview di sidebar list
         setConvList((prev) => {
             const targetIndex = prev.findIndex((c) => c.id === activeConv?.id);
             if (targetIndex !== -1) {
                 const target = { ...prev[targetIndex] };
-                target.lastMessage = sentMsg.message;
-                target.lastMessageTime = sentMsg.created_at;
+                target.lastMessage = msgText;
+                target.lastMessageTime = msgTime;
                 const filtered = prev.filter((c) => c.id !== activeConv?.id);
                 return [target, ...filtered];
             }

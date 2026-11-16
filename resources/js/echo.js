@@ -20,6 +20,19 @@ if (key) {
             forceTLS: isHttps,
             enabledTransports: ['ws', 'wss'],
         });
+
+        // Hubungkan socketId ke Axios agar broadcast()->toOthers() di Laravel bekerja semestinya
+        if (typeof window !== 'undefined' && window.axios) {
+            window.axios.interceptors.request.use((config) => {
+                if (window.Echo && typeof window.Echo.socketId === 'function') {
+                    const socketId = window.Echo.socketId();
+                    if (socketId) {
+                        config.headers['X-Socket-ID'] = socketId;
+                    }
+                }
+                return config;
+            });
+        }
     } catch (e) {
         console.warn('Echo/Pusher init warning:', e);
     }

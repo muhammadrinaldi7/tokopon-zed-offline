@@ -524,10 +524,12 @@ class CsChatController extends Controller
         return response()->json([
             'success' => true,
             'message' => [
-                'id' => $message->id,
+                'id' => (int) $message->id,
                 'user' => $user->name,
                 'text' => $message->message,
+                'message' => $message->message,
                 'time' => now()->format('H:i'),
+                'created_at' => now()->format('H:i'),
                 'isCs' => true,
             ],
         ]);
