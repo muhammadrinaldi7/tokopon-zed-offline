@@ -286,16 +286,16 @@ export default function BuybackSimulatorModal({
         const formattedBase = `Rp ${Number(calculation.basePrice).toLocaleString('id-ID')}`;
         const formattedNet = `Rp ${Number(calculation.netPrice).toLocaleString('id-ID')}`;
 
-        let deductionsText = '';
+        let conditionsText = '';
         if (calculation.deductionsList.length > 0) {
-            deductionsText = calculation.deductionsList
-                .map((d) => ` • ${d.name}: -Rp ${d.amount.toLocaleString('id-ID')}`)
+            conditionsText = calculation.deductionsList
+                .map((d) => ` • ${d.name}`)
                 .join('\n');
         } else {
-            deductionsText = ' • Kondisi Mulus Tanpa Pengurangan Minus (0)';
+            conditionsText = ' • Kondisi Mulus / Grade A Sempurna';
         }
 
-        return `Halo Kak! 👋\nBerikut estimasi taksiran harga beli untuk unit Anda:\n\n📱 *Unit*: ${devName}\n💰 *Harga Acuan Kondisi Mulus*: ${formattedBase}\n\n🔍 *Penyesuaian Kondisi Unit*:\n${deductionsText}\n--------------------------------------------\n💵 *Estimasi Harga Beli*: *${formattedNet}*\n\n📌 *Catatan*:\nEstimasi ini adalah perhitungan terdekat berdasarkan informasi kondisi yang disampaikan. Harga final akan dipastikan oleh tim teknisi kami setelah pengecekan fisik langsung di outlet Tokopon ya Kak. Yuk langsung mampir ke toko kami hari ini! 😊`;
+        return `Halo Kak! 👋\nBerikut estimasi taksiran harga beli untuk unit Anda:\n\n📱 *Unit*: ${devName}\n💰 *Harga Acuan Kondisi Mulus*: ${formattedBase}\n\n🔍 *Kondisi Unit*:\n${conditionsText}\n--------------------------------------------\n💵 *Estimasi Harga Beli*: *${formattedNet}*\n\n📌 *Catatan*:\nEstimasi ini adalah perhitungan terdekat berdasarkan informasi kondisi yang disampaikan. Harga final akan dipastikan oleh tim teknisi kami setelah pengecekan fisik langsung di outlet Tokopon ya Kak. Yuk langsung mampir ke toko kami hari ini! 😊`;
     }, [selectedDevice, calculation]);
 
     const handleCopy = () => {
@@ -801,13 +801,6 @@ export default function BuybackSimulatorModal({
                                                         ? !!selectedRules[item.key]
                                                         : selectedRules[cat.category] === item.key;
 
-                                                    const isDeduction = Number(item.value) > 0;
-                                                    const deductionLabel = isDeduction
-                                                        ? item.type === 'fixed'
-                                                            ? `-Rp ${Number(item.value).toLocaleString('id-ID')}`
-                                                            : `-${item.value}%`
-                                                        : 'Mulus (Rp 0)';
-
                                                     return (
                                                         <button
                                                             key={item.key}
@@ -815,26 +808,19 @@ export default function BuybackSimulatorModal({
                                                             onClick={() =>
                                                                 toggleRule(item.key, cat.category, cat.is_multiple)
                                                             }
-                                                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer select-none border ${
+                                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer select-none border ${
                                                                 isSelected
                                                                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                                                                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                                                             }`}
                                                             title={item.description || item.name}
                                                         >
-                                                            {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                                                            {isSelected ? (
+                                                                <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                                                            ) : (
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                                            )}
                                                             <span>{item.name}</span>
-                                                            <span
-                                                                className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                                                                    isSelected
-                                                                        ? 'bg-emerald-700/80 text-emerald-100'
-                                                                        : isDeduction
-                                                                          ? 'bg-rose-50 text-rose-600 font-extrabold border border-rose-200'
-                                                                          : 'bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200'
-                                                                }`}
-                                                            >
-                                                                {deductionLabel}
-                                                            </span>
                                                         </button>
                                                     );
                                                 })}
@@ -856,19 +842,19 @@ export default function BuybackSimulatorModal({
                                 {calculation.deductionsList.length > 0 && (
                                     <div className="space-y-1.5 py-1 text-xs">
                                         <span className="font-bold text-emerald-100 block">
-                                            Rincian Potongan Minus ({calculation.deductionsList.length}):
+                                            Kondisi Perangkat Dipilih ({calculation.deductionsList.length}):
                                         </span>
-                                        {calculation.deductionsList.map((d, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center justify-between text-emerald-100 text-[11.5px]"
-                                            >
-                                                <span>• {d.name}</span>
-                                                <span className="font-bold text-white">
-                                                    -Rp {d.amount.toLocaleString('id-ID')}
+                                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                            {calculation.deductionsList.map((d, i) => (
+                                                <span
+                                                    key={i}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-800/40 border border-emerald-400/30 text-white text-[11px] font-medium"
+                                                >
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+                                                    <span>{d.name}</span>
                                                 </span>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 
@@ -878,7 +864,7 @@ export default function BuybackSimulatorModal({
                                             Estimasi Harga Beli Riil
                                         </span>
                                         <span className="text-[10.5px] opacity-80">
-                                            {calculation.deductionsList.length} minus kondisi dipilih
+                                            {calculation.deductionsList.length} kondisi dipilih
                                         </span>
                                     </div>
                                     <div className="text-right">
