@@ -136,10 +136,15 @@ class BuybackSimulatorController extends Controller
                 });
             }
 
+            // Jika pencarian tanpa brand (global search), batasi 200 model agar responsif.
+            // Jika brand sudah dipilih (mode filter bertahap SellPhone), tampilkan SEMUA model tanpa limit.
+            if (empty($selectedBrand)) {
+                $modelQuery->limit(200);
+            }
+
             $models = $modelQuery
                 ->orderByRaw('CASE WHEN buy_price > 0 THEN 0 ELSE 1 END')
                 ->orderBy('name')
-                ->limit(60)
                 ->get()
                 ->map(function ($device) {
                     $buyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : $device->base_price);
@@ -228,7 +233,7 @@ class BuybackSimulatorController extends Controller
             ->orderByRaw('CASE WHEN buy_price > 0 THEN 0 ELSE 1 END')
             ->orderByRaw('CASE WHEN business_unit_id = 2 THEN 0 ELSE 1 END')
             ->orderBy('name')
-            ->limit(20)
+            ->limit(150)
             ->get();
 
         $results = $devices->map(function ($device) {
