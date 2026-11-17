@@ -108,6 +108,10 @@ class SalesReport extends Component
                 $this->startDate = $now->copy()->startOfWeek()->format('Y-m-d');
                 $this->endDate = $now->copy()->endOfWeek()->format('Y-m-d');
                 break;
+            case 'last_30_days':
+                $this->startDate = $now->copy()->subDays(29)->startOfDay()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfDay()->format('Y-m-d');
+                break;
             case 'this_month':
                 $this->startDate = $now->copy()->startOfMonth()->format('Y-m-d');
                 $this->endDate = $now->copy()->endOfMonth()->format('Y-m-d');

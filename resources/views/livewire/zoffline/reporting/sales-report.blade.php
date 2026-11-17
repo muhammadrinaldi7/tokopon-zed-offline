@@ -257,6 +257,7 @@
                     <option value="today">Hari Ini</option>
                     <option value="yesterday">Kemarin</option>
                     <option value="this_week">Minggu Ini</option>
+                    <option value="last_30_days">30 Hari Terakhir</option>
                     <option value="this_month">Bulan Ini</option>
                     <option value="last_month">Bulan Lalu</option>
                     <option value="this_year">Tahun Ini</option>
@@ -554,7 +555,8 @@
                                     @endif
                                     @if (($order->coupon_discount_amount ?? 0) > 0)
                                         <p class="text-[11px] text-purple-600 font-medium">
-                                            Voucher ({{ $order->coupon_code }}): -Rp {{ number_format($order->coupon_discount_amount, 0, ',', '.') }}
+                                            Voucher ({{ $order->coupon_code }}): -Rp
+                                            {{ number_format($order->coupon_discount_amount, 0, ',', '.') }}
                                         </p>
                                     @endif
                                     @if (($order->loyalty_discount_amount ?? 0) > 0)
@@ -566,7 +568,11 @@
                                         <p class="text-[11px] text-orange-500 font-medium">MDR: Rp
                                             {{ number_format($order->mdr_amount, 0, ',', '.') }}</p>
                                     @endif
-                                    @if ($order->discount_amount == 0 && ($order->coupon_discount_amount ?? 0) == 0 && ($order->loyalty_discount_amount ?? 0) == 0 && $order->mdr_amount == 0)
+                                    @if (
+                                        $order->discount_amount == 0 &&
+                                            ($order->coupon_discount_amount ?? 0) == 0 &&
+                                            ($order->loyalty_discount_amount ?? 0) == 0 &&
+                                            $order->mdr_amount == 0)
                                         <p class="text-[11px] text-gray-400">-</p>
                                     @endif
                                 </td>
