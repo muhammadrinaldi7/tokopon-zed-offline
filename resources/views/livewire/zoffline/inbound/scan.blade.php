@@ -196,6 +196,9 @@
 
         <!-- Right Column: Item List -->
         <div class="lg:col-span-2 space-y-4">
+            @php
+                $canEditQty = $this->canEditQuantity();
+            @endphp
             @foreach ($po->items as $item)
                 @php
                     $isDone = $item->quantity_received >= $item->quantity_ordered;
@@ -273,12 +276,24 @@
 
                         <!-- Progress Counter & Actions (Right) -->
                         <div class="flex items-center gap-4 md:justify-end shrink-0">
-                            <!-- Counter -->
-                            <div class="text-right">
-                                <div class="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Diterima</div>
-                                <div class="text-2xl font-black {{ $isDone ? 'text-emerald-600' : 'text-blue-600' }}">
-                                    {{ $item->quantity_received }}<span class="text-sm font-bold text-neutral-400">/{{ $item->quantity_ordered }}</span>
+                            <!-- Counter with Edit Button -->
+                            <div class="text-right flex items-center gap-2">
+                                <div>
+                                    <div class="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Diterima</div>
+                                    <div class="text-2xl font-black {{ $isDone ? 'text-emerald-600' : 'text-blue-600' }}">
+                                        {{ $item->quantity_received }}<span class="text-sm font-bold text-neutral-400">/{{ $item->quantity_ordered }}</span>
+                                    </div>
                                 </div>
+                                @if ($canEditQty)
+                                    <button type="button" wire:click="openEditQtyModal({{ $item->id }})"
+                                        class="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-200 cursor-pointer"
+                                        title="Koreksi Kuantitas Diterima (quantity_received)">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                    </button>
+                                @endif
                             </div>
 
                             <!-- Action Buttons -->
@@ -331,6 +346,30 @@
                             @endif
                         </div>
                     </div>
+
+                    {{-- Alert jika ada ketidaksesuaian jumlah IMEI vs quantity_received --}}
+                    @if ($item->has_sn && $item->quantity_received !== $item->inspections->count())
+                        <div class="mx-5 mb-3 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>
+                                    Selisih Data: Qty diterima tercatat <b>{{ $item->quantity_received }}</b>, tapi hasil scan IMEI ada <b>{{ $item->inspections->count() }} unit</b>.
+                                </span>
+                            </div>
+                            @if ($canEditQty)
+                                <button type="button" wire:click="quickSyncQtyWithInspections({{ $item->id }})"
+                                    class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold rounded-lg text-[11px] shadow-xs transition-all shrink-0 cursor-pointer flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <span>Selaraskan ke {{ $item->inspections->count() }}</span>
+                                </button>
+                            @endif
+                        </div>
+                    @endif
 
                     <!-- Micro Progress Bar -->
                     <div class="w-full bg-neutral-100 h-1 overflow-hidden">
@@ -1493,6 +1532,152 @@
                         <span wire:loading.remove wire:target="savePushedImeiCorrection">Simpan & Sinkronkan</span>
                         <span wire:loading wire:target="savePushedImeiCorrection">Memproses Koreksi...</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL KOREKSI KUANTITAS DITERIMA (QUANTITY RECEIVED) --}}
+    @if ($showEditQtyModal)
+        @php
+            $targetEditItem = $po->items->where('id', $editingQtyItemId)->first();
+            $targetInsCount = $targetEditItem ? $targetEditItem->inspections->count() : 0;
+            $targetOrdered = $targetEditItem ? (int)$targetEditItem->quantity_ordered : 0;
+            $targetPushed = $targetEditItem ? (int)$targetEditItem->quantity_pushed : 0;
+        @endphp
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+            {{-- Backdrop Overlay --}}
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" wire:click="closeEditQtyModal"></div>
+
+            {{-- Centering Container --}}
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                {{-- Modal Card --}}
+                <div class="relative z-10 transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md p-6 space-y-5 border border-slate-200">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-black text-slate-800">Koreksi Qty Diterima</h3>
+                                <p class="text-xs text-slate-400">Ubah nilai <code>quantity_received</code> langsung di database</p>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="closeEditQtyModal" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Item Info Card -->
+                    @if ($targetEditItem)
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs space-y-1.5">
+                            <div class="font-bold text-slate-800 text-sm leading-snug">{{ $targetEditItem->item_name }}</div>
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500 font-mono text-[11px]">
+                                <span>SKU: <b>{{ $targetEditItem->item_no }}</b></span>
+                                @if ($targetEditItem->proyek && $targetEditItem->proyek !== '-')
+                                    <span>&bull;</span>
+                                    <span class="text-blue-600 font-sans font-bold">Proyek: {{ $targetEditItem->proyek }}</span>
+                                @endif
+                                <span>&bull;</span>
+                                <span class="text-neutral-700 font-sans">Pesanan: <b>{{ $targetOrdered }} Unit</b></span>
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Error Alert -->
+                    @if ($editQtyErrorMessage)
+                        <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+                            <svg class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <span>{{ $editQtyErrorMessage }}</span>
+                        </div>
+                    @endif
+
+                    <!-- Input Qty -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Kuantitas Diterima Baru (Unit) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" min="0" wire:model="newQuantityReceived"
+                                class="w-full text-center text-2xl font-black font-mono text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-xl p-3 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none" />
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">
+                            Nilai saat ini tercatat: <b>{{ $targetEditItem->quantity_received ?? 0 }} Unit</b>
+                        </p>
+                    </div>
+
+                    <!-- Shortcut Preset Buttons -->
+                    <div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pilihan Cepat (Shortcut):</div>
+                        <div class="flex flex-wrap gap-2">
+                            @if ($targetEditItem && $targetEditItem->has_sn)
+                                <button type="button" wire:click="setQtyToInspections"
+                                    class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                    <span>📱 Samakan dg Scan IMEI ({{ $targetInsCount }})</span>
+                                </button>
+                            @endif
+                            <button type="button" wire:click="setQtyToOrdered"
+                                class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer">
+                                <span>📦 Penuh Sesuai Pesanan ({{ $targetOrdered }})</span>
+                            </button>
+                            @if ($targetPushed > 0)
+                                <button type="button" wire:click="setQtyToPushed"
+                                    class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer">
+                                    <span>Tersinkron Accurate ({{ $targetPushed }})</span>
+                                </button>
+                            @else
+                                <button type="button" wire:click="$set('newQuantityReceived', 0)"
+                                    class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer">
+                                    <span>Reset ke 0</span>
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Warning if < quantity_pushed -->
+                    @if ($targetPushed > 0 && $newQuantityReceived < $targetPushed)
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <span>
+                                <b>Perhatian:</b> Item ini sudah disinkronkan ke Accurate sebanyak <b>{{ $targetPushed }} unit</b>. Menurunkan kuantitas di bawah angka ini tidak otomatis merubah dokumen Accurate.
+                            </span>
+                        </div>
+                    @endif
+
+                    <!-- Optional Reason -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Alasan Koreksi <span class="text-slate-400 font-normal">(Opsional)</span>
+                        </label>
+                        <input type="text" wire:model="editQtyReason"
+                            placeholder="Contoh: Salah pilih baris PO / kuantitas nyasar..."
+                            class="w-full text-xs bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                        <button type="button" wire:click="closeEditQtyModal"
+                            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer">
+                            Batal
+                        </button>
+                        <button type="button" wire:click="saveEditQty"
+                            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Simpan Perubahan</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

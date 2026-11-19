@@ -43,6 +43,13 @@ class Scan extends Component
     public bool $syncAccurateOnCorrection = true;
     public string $correctionErrorMessage = '';
 
+    // Direct Quantity Received Correction Modal State
+    public bool $showEditQtyModal = false;
+    public ?int $editingQtyItemId = null;
+    public int $newQuantityReceived = 0;
+    public string $editQtyReason = '';
+    public string $editQtyErrorMessage = '';
+
     // Warehouse Selection & Confirmation Modal
     public $selectedWarehouseId = null;
     public $showConfirmModal = false;
@@ -570,6 +577,156 @@ class Scan extends Component
             }
             $this->po->refresh();
         }
+    }
+
+    /**
+     * Cek izin otorisasi untuk mengubah / mengoreksi quantity_received
+     */
+    public function canEditQuantity(): bool
+    {
+        $user = Auth::user();
+        if (!$user) return false;
+
+        return $user->can('edit-inbound-qty')
+            || $user->can('correct-inbound-imei')
+            || $user->can('manage-inbound')
+            || $user->hasRole(['admin', 'superadmin', 'Admin', 'Super Admin']);
+    }
+
+    /**
+     * Buka modal koreksi langsung kuantitas diterima (quantity_received) per item
+     */
+    public function openEditQtyModal(int $itemId)
+    {
+        if (!$this->canEditQuantity()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses untuk mengubah kuantitas diterima.', type: 'error');
+            return;
+        }
+
+        $item = $this->po->items->where('id', $itemId)->first();
+        if (!$item) {
+            $this->dispatch('toast', title: 'Error', message: 'Item pesanan tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $this->editingQtyItemId = $itemId;
+        $this->newQuantityReceived = (int)$item->quantity_received;
+        $this->editQtyReason = '';
+        $this->editQtyErrorMessage = '';
+        $this->showEditQtyModal = true;
+    }
+
+    public function closeEditQtyModal()
+    {
+        $this->showEditQtyModal = false;
+        $this->editingQtyItemId = null;
+        $this->newQuantityReceived = 0;
+        $this->editQtyReason = '';
+        $this->editQtyErrorMessage = '';
+    }
+
+    /**
+     * Pintasan modal: Set kuantitas sesuai total scan IMEI pada item ini
+     */
+    public function setQtyToInspections()
+    {
+        if (!$this->editingQtyItemId) return;
+        $item = $this->po->items->where('id', $this->editingQtyItemId)->first();
+        if ($item) {
+            $this->newQuantityReceived = $item->inspections->count();
+        }
+    }
+
+    /**
+     * Pintasan modal: Set kuantitas sesuai target pesanan PO
+     */
+    public function setQtyToOrdered()
+    {
+        if (!$this->editingQtyItemId) return;
+        $item = $this->po->items->where('id', $this->editingQtyItemId)->first();
+        if ($item) {
+            $this->newQuantityReceived = (int)$item->quantity_ordered;
+        }
+    }
+
+    /**
+     * Pintasan modal: Set kuantitas sesuai yang sudah tersinkron ke Accurate
+     */
+    public function setQtyToPushed()
+    {
+        if (!$this->editingQtyItemId) return;
+        $item = $this->po->items->where('id', $this->editingQtyItemId)->first();
+        if ($item) {
+            $this->newQuantityReceived = (int)$item->quantity_pushed;
+        }
+    }
+
+    /**
+     * Simpan perubahan kuantitas diterima ke database
+     */
+    public function saveEditQty()
+    {
+        if (!$this->canEditQuantity()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses.', type: 'error');
+            return;
+        }
+
+        $this->editQtyErrorMessage = '';
+
+        if (!$this->editingQtyItemId) {
+            $this->closeEditQtyModal();
+            return;
+        }
+
+        /** @var PurchaseOrderItem|null $item */
+        $item = $this->po->items->where('id', $this->editingQtyItemId)->first();
+        if (!$item) {
+            $this->closeEditQtyModal();
+            $this->dispatch('toast', title: 'Error', message: 'Item pesanan tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $newQty = (int)$this->newQuantityReceived;
+        if ($newQty < 0) {
+            $this->editQtyErrorMessage = 'Kuantitas diterima tidak boleh kurang dari 0.';
+            return;
+        }
+
+        $oldQty = (int)$item->quantity_received;
+        $item->quantity_received = $newQty;
+        $item->save();
+
+        Log::info("Koreksi Inbound Qty: Item ID {$item->id} ({$item->item_name}) Qty Received diubah dari {$oldQty} ke {$newQty} oleh User ID " . Auth::id() . ($this->editQtyReason ? " | Alasan: {$this->editQtyReason}" : ''));
+
+        $this->closeEditQtyModal();
+        $this->po->refresh();
+        $this->dispatch('toast', title: 'Berhasil', message: "Kuantitas diterima untuk {$item->item_name} berhasil diubah menjadi {$newQty} unit.", type: 'success');
+    }
+
+    /**
+     * 1-Klik Selaraskan Qty Diterima dengan jumlah hasil scan IMEI
+     */
+    public function quickSyncQtyWithInspections(int $itemId)
+    {
+        if (!$this->canEditQuantity()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses untuk menyelaraskan kuantitas.', type: 'error');
+            return;
+        }
+
+        /** @var PurchaseOrderItem|null $item */
+        $item = $this->po->items->where('id', $itemId)->first();
+        if (!$item) return;
+
+        $inspectionsCount = $item->inspections->count();
+        $oldQty = (int)$item->quantity_received;
+
+        $item->quantity_received = $inspectionsCount;
+        $item->save();
+
+        Log::info("Quick Sync Inbound Qty: Item ID {$item->id} ({$item->item_name}) Qty diselaraskan dari {$oldQty} ke {$inspectionsCount} (sesuai IMEI scan) oleh User ID " . Auth::id());
+
+        $this->po->refresh();
+        $this->dispatch('toast', title: 'Kuantitas Diselaraskan', message: "Kuantitas {$item->item_name} berhasil diselaraskan dari {$oldQty} menjadi {$inspectionsCount} unit sesuai hasil scan IMEI.", type: 'success');
     }
 
     public function openConfirmModal()

@@ -59,6 +59,7 @@ class PermissionSeeder extends Seeder
             'manage-sell-phone-issues',
             'correct-sell-phone-bank',
             'correct-inbound-imei',
+            'edit-inbound-qty',
             'manage-buyback',
             'manage-users',
             'manage-settings',
@@ -121,6 +122,7 @@ class PermissionSeeder extends Seeder
             'manage-sell-phone-issues',
             'correct-sell-phone-bank',
             'correct-inbound-imei',
+            'edit-inbound-qty',
             'manage-buyback',
             'view_dashboard'
         ]);
