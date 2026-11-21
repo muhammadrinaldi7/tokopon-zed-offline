@@ -72,12 +72,16 @@
                     <div>
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Merek & Model Terdaftar</p>
                         <div class="flex flex-wrap items-center gap-2 mt-1">
-                            <p class="font-bold text-gray-900 text-base">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}</p>
+                            <p class="font-bold text-gray-900 text-base">{{ $sellPhone->phone_brand }}
+                                {{ $sellPhone->phone_model }}</p>
                             @php
-                                $itemNo = $sellPhone->productAccurate?->item_no ?? ($sellPhone->buybackDevice?->productAccurate?->item_no ?? null);
+                                $itemNo =
+                                    $sellPhone->productAccurate?->item_no ??
+                                    ($sellPhone->buybackDevice?->productAccurate?->item_no ?? null);
                             @endphp
                             @if ($itemNo)
-                                <span class="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-mono font-bold">
+                                <span
+                                    class="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-mono font-bold">
                                     SKU: {{ $itemNo }}
                                 </span>
                             @endif
@@ -116,17 +120,18 @@
                             </p>
                         </div>
                         @if ($sellPhone->salesBy)
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Tenaga Penjual (Sales)</p>
-                            <p
-                                class="font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                {{ $sellPhone->salesBy->name }} ({{ $sellPhone->salesBy->employee_no ?? 'N/A' }})
-                            </p>
-                        </div>
+                            <div>
+                                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Tenaga Penjual
+                                    (Sales)</p>
+                                <p
+                                    class="font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    {{ $sellPhone->salesBy->name }} ({{ $sellPhone->salesBy->employee_no ?? 'N/A' }})
+                                </p>
+                            </div>
                         @endif
                     </div>
                     <div class="col-span-2 mt-2" x-data="{ showQcModal: false }">
@@ -242,7 +247,8 @@
 
                     @if ($sellPhone->buybackDevice)
                         <div class="col-span-2 mt-2">
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Master Harga Dasar
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Master Harga
+                                Dasar
                             </p>
                             <div
                                 class="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-900 font-medium">
@@ -288,8 +294,9 @@
                 </div>
 
                 @php
-                    $userBank = $sellPhone->user?->bankAccounts?->where('is_primary', true)->first()
-                        ?? $sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
+                    $userBank =
+                        $sellPhone->user?->bankAccounts?->where('is_primary', true)->first() ??
+                        $sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
                     $displayBank = $sellPhone->bank_name ?: $userBank?->bank_name ?? null;
                     $displayAccNo = $sellPhone->bank_account_number ?: $userBank?->account_number ?? null;
                     $displayAccName = $sellPhone->bank_account_name ?: $userBank?->account_name ?? null;
@@ -614,7 +621,8 @@
                 <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200 p-6">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                         <div class="flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                            <div
+                                class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -622,7 +630,8 @@
                             </div>
                             <h3 class="font-bold text-base text-slate-900">Riwayat Koreksi & Audit Log</h3>
                         </div>
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <span
+                            class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                             {{ $sellPhone->resetLogs->count() }} Aktivitas
                         </span>
                     </div>
@@ -633,15 +642,18 @@
                                 <div class="flex items-start justify-between gap-2 mb-2">
                                     <div class="flex items-center gap-2">
                                         @if ($log->action_type === 'CORRECTION_SKU')
-                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                            <span
+                                                class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-blue-100 text-blue-800 border border-blue-200">
                                                 Koreksi SKU
                                             </span>
                                         @elseif ($log->action_type === 'RESET_TO_DRAFT')
-                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                            <span
+                                                class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
                                                 Reset ke Draft
                                             </span>
                                         @else
-                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                            <span
+                                                class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-rose-100 text-rose-800 border border-rose-200">
                                                 Dibatalkan (Cancel)
                                             </span>
                                         @endif
@@ -657,27 +669,35 @@
                                 @if ($log->action_type === 'CORRECTION_SKU')
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 my-2 text-xs">
                                         <div class="p-2 rounded bg-rose-50 border border-rose-100 text-rose-900">
-                                            <span class="text-[10px] font-bold text-rose-500 uppercase block">SKU / Model Lama:</span>
+                                            <span class="text-[10px] font-bold text-rose-500 uppercase block">SKU /
+                                                Model Lama:</span>
                                             <span class="font-semibold">{{ $log->previous_phone_model }}</span>
                                             @if ($log->previous_item_no)
-                                                <span class="block text-[11px] font-mono text-rose-700 font-bold">({{ $log->previous_item_no }})</span>
+                                                <span
+                                                    class="block text-[11px] font-mono text-rose-700 font-bold">({{ $log->previous_item_no }})</span>
                                             @endif
                                         </div>
-                                        <div class="p-2 rounded bg-emerald-50 border border-emerald-100 text-emerald-900">
-                                            <span class="text-[10px] font-bold text-emerald-500 uppercase block">SKU / Model Baru:</span>
+                                        <div
+                                            class="p-2 rounded bg-emerald-50 border border-emerald-100 text-emerald-900">
+                                            <span class="text-[10px] font-bold text-emerald-500 uppercase block">SKU /
+                                                Model Baru:</span>
                                             <span class="font-semibold">{{ $log->new_phone_model }}</span>
                                             @if ($log->new_item_no)
-                                                <span class="block text-[11px] font-mono text-emerald-700 font-bold">({{ $log->new_item_no }})</span>
+                                                <span
+                                                    class="block text-[11px] font-mono text-emerald-700 font-bold">({{ $log->new_item_no }})</span>
                                             @endif
                                         </div>
                                     </div>
                                 @endif
 
                                 @if ($log->previous_invoice_number)
-                                    <div class="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200 my-1">
-                                        <span class="text-slate-400">No. Faktur Sebelumnya:</span> <span class="font-mono font-bold text-slate-800">{{ $log->previous_invoice_number }}</span>
+                                    <div
+                                        class="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200 my-1">
+                                        <span class="text-slate-400">No. Faktur Sebelumnya:</span> <span
+                                            class="font-mono font-bold text-slate-800">{{ $log->previous_invoice_number }}</span>
                                         @if ($log->new_invoice_number && $log->new_invoice_number !== $log->previous_invoice_number)
-                                            <span class="text-slate-400 ml-2">&rarr; Baru:</span> <span class="font-mono font-bold text-emerald-700">{{ $log->new_invoice_number }}</span>
+                                            <span class="text-slate-400 ml-2">&rarr; Baru:</span> <span
+                                                class="font-mono font-bold text-emerald-700">{{ $log->new_invoice_number }}</span>
                                         @endif
                                     </div>
                                 @endif
@@ -710,9 +730,11 @@
                                 {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</p>
 
                             @if ($sellPhone->status === 'PAYING')
-                                {{-- <button type="button" @click="editingPrice = true"
-                                    class="mt-2 text-xs font-bold text-emerald-600 underline hover:text-emerald-800 focus:outline-none">Ubah
-                                    Harga</button> --}}
+                                @role('superadmin')
+                                    <button type="button" @click="editingPrice = true"
+                                        class="mt-2 text-xs font-bold text-emerald-600 underline hover:text-emerald-800 focus:outline-none">Ubah
+                                        Harga</button>
+                                @endrole
                             @else
                                 <p class="text-xs text-emerald-600 mt-2">Dihitung otomatis dari Base Price & Rules.</p>
                             @endif
@@ -722,17 +744,19 @@
                             class="mt-3 text-left bg-white p-4 rounded-xl border border-emerald-200 shadow-sm">
                             <label class="block text-xs font-bold text-emerald-900 mb-2">Nominal Harga Baru
                                 (Rp)</label>
-                            <div class="relative mb-3" wire:key="edit-appraised-value-container" x-data="{
-                                rawVal: @entangle('appraisedValue'),
-                                get maskedVal() {
-                                    if (!this.rawVal && this.rawVal !== 0) return '';
-                                    return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                },
-                                set maskedVal(val) {
-                                    this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
-                                }
-                            }">
-                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
+                            <div class="relative mb-3" wire:key="edit-appraised-value-container"
+                                x-data="{
+                                    rawVal: @entangle('appraisedValue'),
+                                    get maskedVal() {
+                                        if (!this.rawVal && this.rawVal !== 0) return '';
+                                        return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                    },
+                                    set maskedVal(val) {
+                                        this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                    }
+                                }">
+                                <span
+                                    class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
                                 <input type="text" x-model="maskedVal"
                                     @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                     class="w-full pl-11 pr-3.5 p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono outline-none transition-all font-bold"
@@ -803,17 +827,19 @@
                                 <div>
                                     <label class="block text-sm font-bold text-amber-900 mb-1">Harga Penawaran Baru
                                         (Rp)</label>
-                                    <div class="relative" wire:key="revised-appraised-value-container" x-data="{
-                                        rawVal: @entangle('revisedAppraisedValue'),
-                                        get maskedVal() {
-                                            if (!this.rawVal && this.rawVal !== 0) return '';
-                                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                        },
-                                        set maskedVal(val) {
-                                            this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
-                                        }
-                                    }">
-                                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
+                                    <div class="relative" wire:key="revised-appraised-value-container"
+                                        x-data="{
+                                            rawVal: @entangle('revisedAppraisedValue'),
+                                            get maskedVal() {
+                                                if (!this.rawVal && this.rawVal !== 0) return '';
+                                                return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            },
+                                            set maskedVal(val) {
+                                                this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                            }
+                                        }">
+                                        <span
+                                            class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
                                         <input type="text" x-model="maskedVal"
                                             @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                             class="w-full pl-11 pr-3.5 py-2.5 rounded-lg border-amber-200 focus:ring-amber-500 focus:border-amber-500 bg-white font-mono font-bold text-sm"
@@ -1150,11 +1176,14 @@
 
     {{-- Modal Koreksi SKU / Model --}}
     @if ($showCorrectionModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+            <div
+                class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -1162,12 +1191,15 @@
                         </div>
                         <div>
                             <h3 class="font-bold text-lg text-slate-900">Koreksi SKU / Model Produk</h3>
-                            <p class="text-xs text-slate-500 font-medium">Ubah master produk unit pembelian & sinkronkan ulang ke Accurate</p>
+                            <p class="text-xs text-slate-500 font-medium">Ubah master produk unit pembelian &
+                                sinkronkan ulang ke Accurate</p>
                         </div>
                     </div>
-                    <button type="button" wire:click="closeCorrectionModal" class="text-slate-400 hover:text-slate-600">
+                    <button type="button" wire:click="closeCorrectionModal"
+                        class="text-slate-400 hover:text-slate-600">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
@@ -1178,9 +1210,12 @@
                         <span class="text-slate-400 font-bold uppercase">Data Saat Ini</span>
                         <span class="font-mono font-bold text-slate-700">IMEI: {{ $sellPhone->imei ?? '-' }}</span>
                     </div>
-                    <div class="font-bold text-slate-800 text-sm">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}</div>
+                    <div class="font-bold text-slate-800 text-sm">{{ $sellPhone->phone_brand }}
+                        {{ $sellPhone->phone_model }}</div>
                     @if ($sellPhone->invoice_number)
-                        <div class="text-slate-500 mt-1">Faktur Accurate: <span class="font-mono font-bold text-slate-700">{{ $sellPhone->invoice_number }}</span></div>
+                        <div class="text-slate-500 mt-1">Faktur Accurate: <span
+                                class="font-mono font-bold text-slate-700">{{ $sellPhone->invoice_number }}</span>
+                        </div>
                     @endif
                 </div>
 
@@ -1204,15 +1239,18 @@
 
                         {{-- Dropdown Hasil Pencarian --}}
                         @if (strlen($searchProductQuery) >= 2 && empty($targetProductAccurateId))
-                            <div class="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto z-20 divide-y divide-slate-100">
+                            <div
+                                class="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto z-20 divide-y divide-slate-100">
                                 @forelse ($this->productSearchResults as $pa)
                                     <button type="button" wire:click="selectTargetProduct({{ $pa->id }})"
                                         class="w-full text-left p-2.5 hover:bg-indigo-50/70 transition flex items-center justify-between text-xs">
                                         <div>
                                             <div class="font-bold text-slate-900">{{ $pa->name }}</div>
-                                            <div class="font-mono text-[11px] text-slate-500">{{ $pa->item_no }} &bull; {{ $pa->brandName ?? '-' }}</div>
+                                            <div class="font-mono text-[11px] text-slate-500">{{ $pa->item_no }}
+                                                &bull; {{ $pa->brandName ?? '-' }}</div>
                                         </div>
-                                        <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md font-bold text-[10px]">Pilih</span>
+                                        <span
+                                            class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md font-bold text-[10px]">Pilih</span>
                                     </button>
                                 @empty
                                     <div class="p-3 text-center text-xs text-slate-400 font-medium">
@@ -1231,11 +1269,16 @@
                     @if ($this->targetProductAccurate)
                         <div class="p-3.5 bg-indigo-50/60 border border-indigo-200 rounded-xl text-xs">
                             <div class="flex items-center justify-between">
-                                <span class="text-indigo-700 font-bold uppercase text-[10px]">Produk Target Terpilih</span>
-                                <button type="button" wire:click="$set('targetProductAccurateId', null); $set('searchProductQuery', '')" class="text-rose-500 hover:underline text-[11px] font-bold">Ganti</button>
+                                <span class="text-indigo-700 font-bold uppercase text-[10px]">Produk Target
+                                    Terpilih</span>
+                                <button type="button"
+                                    wire:click="$set('targetProductAccurateId', null); $set('searchProductQuery', '')"
+                                    class="text-rose-500 hover:underline text-[11px] font-bold">Ganti</button>
                             </div>
-                            <div class="font-bold text-slate-900 text-sm mt-0.5">{{ $this->targetProductAccurate->name }}</div>
-                            <div class="font-mono text-xs text-indigo-800 mt-0.5">SKU: {{ $this->targetProductAccurate->item_no }}</div>
+                            <div class="font-bold text-slate-900 text-sm mt-0.5">
+                                {{ $this->targetProductAccurate->name }}</div>
+                            <div class="font-mono text-xs text-indigo-800 mt-0.5">SKU:
+                                {{ $this->targetProductAccurate->item_no }}</div>
                         </div>
                     @endif
 
@@ -1257,9 +1300,11 @@
                         <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
                             <input type="checkbox" id="syncAccurateCheckbox" wire:model="syncAccurateOnCorrection"
                                 class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-amber-300">
-                            <label for="syncAccurateCheckbox" class="text-xs text-amber-900 font-medium cursor-pointer">
+                            <label for="syncAccurateCheckbox"
+                                class="text-xs text-amber-900 font-medium cursor-pointer">
                                 <b>Otomatis Perbarui di Accurate Online</b><br>
-                                Sistem akan membatalkan pembayaran lama, memperbarui faktur ke SKU baru, dan membayar ulang secara otomatis.
+                                Sistem akan membatalkan pembayaran lama, memperbarui faktur ke SKU baru, dan membayar
+                                ulang secara otomatis.
                             </label>
                         </div>
                     @endif
@@ -1273,9 +1318,11 @@
                             class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2 shadow-sm">
                             <svg wire:loading wire:target="executeSkuCorrection" class="animate-spin h-3.5 w-3.5"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
                             </svg>
                             Terapkan Koreksi
                         </button>
@@ -1287,10 +1334,13 @@
 
     {{-- Modal Batal / Reset Transaksi Pembelian --}}
     @if ($showCancelModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+            <div
+                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
                 <div class="flex items-center gap-3 mb-4">
-                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold shrink-0">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1298,7 +1348,8 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-lg text-slate-900">Batal / Reset Transaksi Pembelian</h3>
-                        <p class="text-xs text-slate-500 font-medium">Batalkan dokumen Accurate, tarik kembali Serial Number, dan reset status</p>
+                        <p class="text-xs text-slate-500 font-medium">Batalkan dokumen Accurate, tarik kembali Serial
+                            Number, dan reset status</p>
                     </div>
                 </div>
 
@@ -1309,17 +1360,22 @@
                             Pilih Jenis Tindakan
                         </label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                            <label class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'RESET_TO_DRAFT' ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' : 'bg-slate-50 border-slate-200' }}">
+                            <label
+                                class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'RESET_TO_DRAFT' ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' : 'bg-slate-50 border-slate-200' }}">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <input type="radio" wire:model.live="cancelActionType" value="RESET_TO_DRAFT" class="text-amber-600 focus:ring-amber-500">
+                                    <input type="radio" wire:model.live="cancelActionType" value="RESET_TO_DRAFT"
+                                        class="text-amber-600 focus:ring-amber-500">
                                     <span class="font-bold text-slate-900">Reset ke Draft (PAYING)</span>
                                 </div>
-                                <span class="text-[11px] text-slate-500">Kembalikan ke status belum lunas agar bisa disubmit ulang.</span>
+                                <span class="text-[11px] text-slate-500">Kembalikan ke status belum lunas agar bisa
+                                    disubmit ulang.</span>
                             </label>
 
-                            <label class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'CANCELLED' ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-400/30' : 'bg-slate-50 border-slate-200' }}">
+                            <label
+                                class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'CANCELLED' ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-400/30' : 'bg-slate-50 border-slate-200' }}">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <input type="radio" wire:model.live="cancelActionType" value="CANCELLED" class="text-rose-600 focus:ring-rose-500">
+                                    <input type="radio" wire:model.live="cancelActionType" value="CANCELLED"
+                                        class="text-rose-600 focus:ring-rose-500">
                                     <span class="font-bold text-slate-900">Batalkan Total (CANCELLED)</span>
                                 </div>
                                 <span class="text-[11px] text-slate-500">Batalkan transaksi secara permanen.</span>
@@ -1330,7 +1386,8 @@
                     {{-- Warning Box --}}
                     <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
                         <div class="font-bold flex items-center gap-1.5 text-rose-900">
-                            <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
@@ -1338,9 +1395,11 @@
                         </div>
                         <ul class="list-disc list-inside space-y-0.5 text-[11px] text-rose-700">
                             @if ($sellPhone->invoice_number)
-                                <li>Pembayaran Pembelian & Faktur Pembelian (<b>{{ $sellPhone->invoice_number }}</b>) di Accurate akan otomatis dihapus via API.</li>
+                                <li>Pembayaran Pembelian & Faktur Pembelian (<b>{{ $sellPhone->invoice_number }}</b>)
+                                    di Accurate akan otomatis dihapus via API.</li>
                             @endif
-                            <li>Serial Number (IMEI: <b>{{ $sellPhone->imei }}</b>) dan Stok Gudang akan ditarik/dikurangi.</li>
+                            <li>Serial Number (IMEI: <b>{{ $sellPhone->imei }}</b>) dan Stok Gudang akan
+                                ditarik/dikurangi.</li>
                         </ul>
                     </div>
 
@@ -1366,9 +1425,11 @@
                             class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2 shadow-sm">
                             <svg wire:loading wire:target="executeCancelOrReset" class="animate-spin h-3.5 w-3.5"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
                             </svg>
                             Konfirmasi Eksekusi
                         </button>
