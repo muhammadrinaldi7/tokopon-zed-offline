@@ -51,7 +51,7 @@
         {{-- Filter & Search Bar --}}
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-6">
             {{-- Search Bar --}}
-            <div class="md:col-span-4 relative">
+            <div class="md:col-span-3 relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -60,7 +60,7 @@
                 </div>
                 <input wire:model.live.debounce.300ms="search" type="text"
                     class="pl-10 p-2.5 w-full rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm"
-                    placeholder="Cari No. SO, Accurate, atau Nama Pelanggan...">
+                    placeholder="Cari No. SO, Accurate, Pelanggan...">
             </div>
 
             {{-- Filter Unit Bisnis --}}
@@ -89,7 +89,7 @@
             </div>
 
             {{-- Filter Cabang --}}
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 @if ($isBranchLocked)
                     <div class="relative">
                         <select disabled
@@ -111,6 +111,19 @@
                         @endforeach
                     </select>
                 @endif
+            </div>
+
+            {{-- Filter Status Pesanan --}}
+            <div class="md:col-span-2">
+                <select wire:model.live="filterStatus"
+                    class="p-2.5 w-full rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white font-medium">
+                    <option value="">Semua Status</option>
+                    <option value="pending">⏳ Pending</option>
+                    <option value="down_payment">💳 DP Dibayar</option>
+                    <option value="paid">💰 Lunas (Paid)</option>
+                    <option value="COMPLETED">✅ Selesai (Completed)</option>
+                    <option value="cancelled">❌ Dibatalkan (Cancel)</option>
+                </select>
             </div>
 
             {{-- Filter Alokasi IMEI --}}
@@ -204,9 +217,15 @@
                                         <span
                                             class="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-md border border-blue-200">DP
                                             Dibayar</span>
+                                    @elseif($order->order_status === 'paid')
+                                        <span
+                                            class="px-2.5 py-1 bg-teal-50 text-teal-600 text-[10px] font-bold uppercase rounded-md border border-teal-200">Lunas</span>
                                     @elseif($order->order_status === 'COMPLETED')
                                         <span
                                             class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase rounded-md border border-emerald-200">Selesai</span>
+                                    @elseif(in_array(strtolower($order->order_status), ['cancelled', 'cancel']))
+                                        <span
+                                            class="px-2.5 py-1 bg-rose-50 text-rose-600 text-[10px] font-bold uppercase rounded-md border border-rose-200">Dibatalkan</span>
                                     @else
                                         <span
                                             class="px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-bold uppercase rounded-md border border-gray-200">{{ $order->order_status }}</span>

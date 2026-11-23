@@ -1122,19 +1122,32 @@
                         </div>
                     </div>
 
-                    {{-- Form Nominal --}}
-                    <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                Nominal Refund Dicairkan (Rp) <span class="text-rose-500">*</span>
-                            </label>
-                            <span class="text-[11px] text-gray-400">Maks. Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                    {{-- Form Nominal & Tanggal Refund --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    Nominal Refund (Rp) <span class="text-rose-500">*</span>
+                                </label>
+                                <span class="text-[11px] text-gray-400">Maks. Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="relative">
+                                <span class="absolute left-4 top-2.5 text-sm font-bold text-gray-400">Rp</span>
+                                <input type="number" wire:model="refundAmount" class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-black text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition" min="1" max="{{ $refundAmount }}">
+                            </div>
+                            @error('refundAmount') <span class="text-xs text-rose-500 mt-1 block font-semibold">{{ $message }}</span> @enderror
                         </div>
-                        <div class="relative">
-                            <span class="absolute left-4 top-2.5 text-sm font-bold text-gray-400">Rp</span>
-                            <input type="number" wire:model="refundAmount" class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-black text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition" min="1" max="{{ $refundAmount }}">
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    Tanggal Transaksi Refund <span class="text-rose-500">*</span>
+                                </label>
+                                <span class="text-[11px] text-gray-400">Kirim ke Accurate</span>
+                            </div>
+                            <input type="date" wire:model="refundDate" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition cursor-pointer">
+                            @error('refundDate') <span class="text-xs text-rose-500 mt-1 block font-semibold">{{ $message }}</span> @enderror
                         </div>
-                        @error('refundAmount') <span class="text-xs text-rose-500 mt-1 block font-semibold">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- AKUN KAS / BANK PENGELUARAN TOKO (Interactive Cards with Bank Identity) --}}

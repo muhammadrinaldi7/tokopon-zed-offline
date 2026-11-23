@@ -18,6 +18,7 @@ class Index extends Component
     public $filterBusinessUnitId = '';
     public $filterBranchId = '';
     public $filterImeiStatus = '';
+    public $filterStatus = '';
 
     public function mount()
     {
@@ -83,6 +84,11 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterStatus()
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters()
     {
         $user = Auth::user();
@@ -91,6 +97,7 @@ class Index extends Component
 
         $this->search = '';
         $this->filterImeiStatus = '';
+        $this->filterStatus = '';
 
         if ($isAdmin) {
             $activeBu = $user->getActiveBusinessUnitId();
@@ -150,6 +157,15 @@ class Index extends Component
             $ordersQuery->whereDoesntHave('items', function ($q) {
                 $q->whereNotNull('serial_number')->where('serial_number', '!=', '');
             });
+        }
+
+        // Filter Status Pesanan
+        if (!empty($this->filterStatus)) {
+            if ($this->filterStatus === 'cancelled') {
+                $ordersQuery->whereIn('order_status', ['CANCELLED', 'cancelled', 'cancel']);
+            } else {
+                $ordersQuery->where('order_status', $this->filterStatus);
+            }
         }
 
         // Scoping keamanan berdasarkan role

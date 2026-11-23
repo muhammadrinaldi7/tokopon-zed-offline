@@ -2680,12 +2680,13 @@ class AccurateService
     /**
      * Memproses pengembalian uang muka (Refund DP) ke customer akibat pembatalan SO
      */
-    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null)
+    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null, $transDate = null)
     {
         $rawBranchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? ($order->branch->name ?? 'Cabang Utama');
         $bu = $order->businessUnit ?: \App\Models\BusinessUnit::where('code', $dbSource)->first();
         $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
         $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
+        $actualTransDate = $transDate ? \Carbon\Carbon::parse($transDate)->format('d/m/Y') : now()->format('d/m/Y');
 
         // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
         if (!empty($customBankNo) && $customAmount !== null) {
@@ -2697,7 +2698,7 @@ class AccurateService
             $receiptPayload = [
                 'customerNo' => $customerNo,
                 'bankNo' => $customBankNo,
-                'transDate' => now()->format('d/m/Y'),
+                'transDate' => $actualTransDate,
                 'branchName' => $branchName,
                 'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
                 'useCredit' => false,
@@ -2746,7 +2747,7 @@ class AccurateService
             $receiptPayload = [
                 'customerNo' => $customerNo,
                 'bankNo' => $bankNo,
-                'transDate' => now()->format('d/m/Y'),
+                'transDate' => $actualTransDate,
                 'branchName' => $branchName,
                 'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
                 'useCredit' => false,
