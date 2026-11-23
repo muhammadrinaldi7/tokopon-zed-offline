@@ -141,6 +141,11 @@ new class extends Component {
                             </div>
                         </div>
                     </div> --}}
+                    <a href="{{ route('zoffline.estimasi-harga-beli') }}" wire:navigate
+                        class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
+                        Estimasi Harga Beli
+                    </a>
+
                     <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
                         class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                         History Sell Phone
@@ -210,6 +215,10 @@ new class extends Component {
                         Dashboard Admin
                     </a>
                 @endif
+                    <a href="{{ route('zoffline.estimasi-harga-beli') }}" wire:navigate
+                        class="block px-4 py-2 text-sm text-left text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
+                        Estimasi Harga Beli
+                    </a>
                 @can('sell-phone-history')
                     {{-- Item: Jual HP --}}
                     <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate

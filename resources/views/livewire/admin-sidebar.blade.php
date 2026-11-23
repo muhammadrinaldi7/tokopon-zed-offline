@@ -415,6 +415,10 @@
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('zoffline.sell-phone') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Proses Pembelian
                     </a>
+                    <a href="{{ route('zoffline.estimasi-harga-beli') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('zoffline.estimasi-harga-beli') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Estimasi Harga Beli
+                    </a>
                     <a href="{{ route('admin.finance.warranty-return') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.finance.warranty-return') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Proses Garansi/Retur
@@ -558,6 +562,10 @@
                     <a href="{{ route('admin.buyback.tiers') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.tiers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Aturan Harga Beli
+                    </a>
+                    <a href="{{ route('zoffline.estimasi-harga-beli') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('zoffline.estimasi-harga-beli') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Simulasi Estimasi Harga Beli
                     </a>
                 </div>
             </div>

@@ -51,6 +51,11 @@ class Home extends Component
         return $this->redirectRoute('zoffline.sell-phone', navigate: true);
     }
 
+    public function navigateToEstimasiHargaBeli()
+    {
+        return $this->redirectRoute('zoffline.estimasi-harga-beli', navigate: true);
+    }
+
     public function navigateToWarrantyActivation()
     {
         return $this->redirectRoute('zoffline.warranty-activation', navigate: true);

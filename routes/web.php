@@ -50,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in')->middleware('can:trade-in');
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone-history');
+    Route::get('/zoffline/estimasi-harga-beli', \App\Livewire\Zoffline\SellPhone\PriceEstimator::class)->name('zoffline.estimasi-harga-beli');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/warranty-claim', WarrantyClaim::class)->name('zoffline.warranty-claim')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
