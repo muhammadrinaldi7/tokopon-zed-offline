@@ -124,25 +124,25 @@
         @endcan
 
         {{-- Card: Estimasi Harga Beli (Simulasi Buyback HP) --}}
-        @if (auth()->user()->can('sell-phone') || auth()->user()->can('view-pos') || auth()->user()->hasAnyRole(['admin', 'superadmin', 'cs', 'bm', 'kasir']))
-            <div wire:click="navigateToEstimasiHargaBeli"
-                class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+        <div wire:click="navigateToEstimasiHargaBeli"
+            class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
 
-                {{-- Ikon tetap di atas --}}
-                <div class="rounded-full w-20 h-20 bg-amber-100 flex items-center justify-center text-amber-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                </div>
-
-                {{-- Teks di bawah --}}
-                <div>
-                    <h1 class="text-2xl ">Estimasi <br> Harga Beli</h1>
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Simulasi taksiran harga HP customer</p>
-                </div>
+            {{-- Ikon tetap di atas --}}
+            <div class="rounded-full w-20 h-20 bg-amber-100 flex items-center justify-center text-amber-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
             </div>
-        @endif
+
+            {{-- Teks di bawah --}}
+            <div>
+                <h1 class="text-2xl ">Estimasi <br> Harga Beli</h1>
+                <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Simulasi taksiran harga HP customer</p>
+            </div>
+        </div>
+
         @can('warranty-activation')
             <div x-data="{ openGaransiModal: false }" class="md:nth-[3n+1]:col-span-2 w-full">
                 {{-- Card 3: Garansi --}}
