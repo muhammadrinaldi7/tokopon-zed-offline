@@ -52,10 +52,31 @@ class PriceEstimator extends Component
 
     // Pola brand aksesoris / non-HP yang dikecualikan
     protected array $excludedBrandPatterns = [
-        'JETE', 'KIIP', 'OLIKE', 'OTHERS ACC', 'ROBOT', 'ROKER', 'VIVAN',
-        'UGREEN', 'ANKER', 'BASEUS', 'BMW', 'COSTUM', 'HIKARU', 'M2K',
-        'OASE', 'SULADA', 'TITON', 'X GUARD', 'MAGIC GLASS', 'NILLKIN',
-        'OEM', 'ICOLOR', 'OTHERS', 'INDOSCREEN', 'HARDWEAR'
+        'JETE',
+        'KIIP',
+        'OLIKE',
+        'OTHERS ACC',
+        'ROBOT',
+        'ROKER',
+        'VIVAN',
+        'UGREEN',
+        'ANKER',
+        'BASEUS',
+        'BMW',
+        'COSTUM',
+        'HIKARU',
+        'M2K',
+        'OASE',
+        'SULADA',
+        'TITON',
+        'X GUARD',
+        'MAGIC GLASS',
+        'NILLKIN',
+        'OEM',
+        'ICOLOR',
+        'OTHERS',
+        'INDOSCREEN',
+        'HARDWEAR'
     ];
 
     public function mount()
@@ -88,11 +109,11 @@ class PriceEstimator extends Component
                 $catQuery->whereNull('categoryName')
                     ->orWhere(function ($c) {
                         $c->where('categoryName', 'not like', '%ANTI GORES%')
-                          ->where('categoryName', 'not like', '%AKSESORIS%')
-                          ->where('categoryName', 'not like', '%ACCESSORIES%')
-                          ->where('categoryName', 'not like', '%SPAREPART%')
-                          ->where('categoryName', 'not like', '%TEMPERED%')
-                          ->where('categoryName', 'not like', '%CASE%');
+                            ->where('categoryName', 'not like', '%AKSESORIS%')
+                            ->where('categoryName', 'not like', '%ACCESSORIES%')
+                            ->where('categoryName', 'not like', '%SPAREPART%')
+                            ->where('categoryName', 'not like', '%TEMPERED%')
+                            ->where('categoryName', 'not like', '%CASE%');
                     });
             })
             ->whereNotNull('brandName')
@@ -150,11 +171,11 @@ class PriceEstimator extends Component
             ->where('categoryName', '!=', '')
             ->where(function ($c) {
                 $c->where('categoryName', 'not like', '%ANTI GORES%')
-                  ->where('categoryName', 'not like', '%AKSESORIS%')
-                  ->where('categoryName', 'not like', '%ACCESSORIES%')
-                  ->where('categoryName', 'not like', '%SPAREPART%')
-                  ->where('categoryName', 'not like', '%TEMPERED%')
-                  ->where('categoryName', 'not like', '%CASE%');
+                    ->where('categoryName', 'not like', '%AKSESORIS%')
+                    ->where('categoryName', 'not like', '%ACCESSORIES%')
+                    ->where('categoryName', 'not like', '%SPAREPART%')
+                    ->where('categoryName', 'not like', '%TEMPERED%')
+                    ->where('categoryName', 'not like', '%CASE%');
             })
             ->select('categoryName')
             ->distinct()
@@ -596,10 +617,10 @@ class PriceEstimator extends Component
         $formattedPrice = 'Rp ' . number_format($this->calculated_price, 0, ',', '.');
 
         return "*ESTIMASI HARGA BELI HP*\n" .
-            "📱 *Model:* {$modelName}\n" .
-            "🏢 *Merek:* {$brandInfo}\n\n" .
-            "📋 *Kondisi Unit:*\n- {$conditionText}\n\n" .
-            "💰 *Estimasi Harga Beli:* {$formattedPrice}\n\n" .
+            " *Model:* {$modelName}\n" .
+            " *Merek:* {$brandInfo}\n\n" .
+            " *Kondisi Unit:*\n- {$conditionText}\n\n" .
+            " *Estimasi Harga Beli:* {$formattedPrice}\n\n" .
             "_Catatan: Harga di atas adalah taksiran estimasi awal. Harga final ditentukan setelah pengecekan fisik langsung di toko TokoPon._";
     }
 
@@ -622,11 +643,11 @@ class PriceEstimator extends Component
                 $catQuery->whereNull('categoryName')
                     ->orWhere(function ($c) {
                         $c->where('categoryName', 'not like', '%ANTI GORES%')
-                          ->where('categoryName', 'not like', '%AKSESORIS%')
-                          ->where('categoryName', 'not like', '%ACCESSORIES%')
-                          ->where('categoryName', 'not like', '%SPAREPART%')
-                          ->where('categoryName', 'not like', '%TEMPERED%')
-                          ->where('categoryName', 'not like', '%CASE%');
+                            ->where('categoryName', 'not like', '%AKSESORIS%')
+                            ->where('categoryName', 'not like', '%ACCESSORIES%')
+                            ->where('categoryName', 'not like', '%SPAREPART%')
+                            ->where('categoryName', 'not like', '%TEMPERED%')
+                            ->where('categoryName', 'not like', '%CASE%');
                     });
             })
             ->where('name', 'not like', '%ANTI GORES%')
