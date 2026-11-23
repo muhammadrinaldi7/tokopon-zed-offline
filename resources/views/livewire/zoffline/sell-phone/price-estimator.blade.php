@@ -231,47 +231,111 @@
                     @endif
                 </div>
 
-                {{-- STEP 4: PILIH MODEL HP --}}
-                <div class="bg-white rounded-3xl p-6 shadow-sm border border-neutral-200/80 space-y-4 animate-fade-in">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div>
-                            <span class="text-xs font-bold text-[#A28153] uppercase tracking-wider">Langkah 4</span>
-                            <h2 class="text-lg font-bold text-neutral-800">
-                                Pilih Tipe / Model HP ({{ count($filteredModels) }} model tersedia)
-                            </h2>
+                {{-- STEP 4: PILIH MODEL HP (Muncul jika kategori sudah dipilih atau tidak ada kategori terpisah) --}}
+                @if ($selected_categoryName || count($available_categories) === 0)
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-neutral-200/80 space-y-4 animate-fade-in">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-xs font-bold text-[#A28153] uppercase tracking-wider">
+                                    {{ count($available_proyek) > 0 ? 'Langkah 4' : 'Langkah 3' }}
+                                </span>
+                                <h2 class="text-lg font-bold text-neutral-800">
+                                    Pilih Tipe / Model HP ({{ count($available_models) }} model tersedia)
+                                </h2>
+                            </div>
+                            @if ($selected_proyek)
+                                <span class="text-xs font-semibold text-neutral-400">
+                                    Proyek: <strong class="text-neutral-700">{{ $selected_proyek }}</strong>
+                                </span>
+                            @endif
                         </div>
 
-                        {{-- Search Filter Model --}}
-                        <div class="w-full md:w-72">
-                            <input type="text" wire:model.live.debounce.250ms="model_search"
-                                placeholder="Saring tipe model HP..."
-                                class="w-full px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#D3AD7B]">
-                        </div>
-                    </div>
+                        @if (count($available_models) > 0)
+                            <!-- Alpine.js Searchable Combobox Dropdown (Ultra Cepat, 0ms latency) -->
+                            <div x-data="{
+                                open: false,
+                                search: '',
+                                models: @js($available_models),
+                                get filteredModels() {
+                                    let searchStr = (this.search || '').toString().toLowerCase().trim();
+                                    if (!searchStr) return this.models;
+                                    return this.models.filter(m => (m.name || '').toString().toLowerCase().includes(searchStr) || (m.item_no || '').toString().toLowerCase().includes(searchStr));
+                                },
+                                selectModel(model) {
+                                    this.search = model.name;
+                                    this.open = false;
+                                    $wire.selectProduct(model.id);
+                                }
+                            }" wire:key="model-combo-{{ $selected_brand_id }}-{{ $selected_categoryName }}-{{ $selected_proyek }}"
+                                @click.away="open = false" class="relative w-full">
 
-                    @if (count($filteredModels) > 0)
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-96 overflow-y-auto p-1">
-                            @foreach ($filteredModels as $m)
-                                <button type="button" wire:click="selectProduct({{ $m['id'] }})"
-                                    class="p-4 rounded-2xl border border-neutral-200/80 bg-neutral-50/40 hover:bg-white hover:border-[#D3AD7B] hover:shadow-md transition-all text-left flex flex-col justify-between group cursor-pointer">
-                                    <span class="font-bold text-sm text-neutral-800 group-hover:text-[#A28153] leading-snug line-clamp-2">
-                                        {{ $m['name'] }}
-                                    </span>
-                                    <div class="mt-3 pt-2 border-t border-neutral-200/50 flex items-center justify-between text-xs">
-                                        <span class="text-[11px] text-neutral-400 font-mono">{{ $m['item_no'] }}</span>
-                                        <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                                            {{ $m['formatted_price'] }}
-                                        </span>
+                                <div class="relative w-full">
+                                    <input type="text" x-model="search" @focus="open = true" @click="open = true"
+                                        placeholder="Ketik nama tipe model HP untuk mencari (contoh: 13 128GB, Pro Max, dsb)..."
+                                        autocomplete="off"
+                                        class="w-full p-4 bg-neutral-50/70 hover:bg-white shadow-xs border-2 border-neutral-200 focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 rounded-2xl outline-none transition-all font-bold text-neutral-800 cursor-text pr-12 text-sm md:text-base">
+
+                                    <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-neutral-400">
+                                        <svg class="w-5 h-5 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
                                     </div>
-                                </button>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="p-8 text-center text-sm text-neutral-400 bg-neutral-50 rounded-2xl border border-neutral-200">
-                            Tidak ada model yang cocok dengan kriteria filter saat ini.
-                        </div>
-                    @endif
-                </div>
+                                </div>
+
+                                <!-- Dropdown List Hasil Pencarian Model -->
+                                <div x-show="open" x-transition.opacity.duration.150ms x-cloak
+                                    class="absolute z-50 w-full mt-2 bg-white border border-neutral-200 rounded-2xl shadow-xl max-h-72 overflow-y-auto p-2 space-y-1">
+                                    <template x-for="model in filteredModels.slice(0, 50)" :key="model.id">
+                                        <button @mousedown="selectModel(model)" @click="selectModel(model)"
+                                            type="button"
+                                            class="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between hover:bg-neutral-100 group cursor-pointer text-neutral-700">
+                                            <div>
+                                                <span x-text="model.name" class="block leading-snug"></span>
+                                                <span x-show="model.item_no" x-text="model.item_no" class="text-[11px] text-neutral-400 font-mono"></span>
+                                            </div>
+                                            <span x-show="model.formatted_price" x-text="model.formatted_price"
+                                                class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg shrink-0 ml-2"></span>
+                                        </button>
+                                    </template>
+
+                                    <div x-show="filteredModels.length === 0" class="px-4 py-4 text-xs text-neutral-400 text-center font-medium">
+                                        Tidak ada model yang cocok dengan pencarian "<span x-text="search" class="font-bold"></span>".
+                                    </div>
+                                    <div x-show="filteredModels.length > 50" class="px-4 py-2 text-[11px] text-neutral-400 text-center border-t border-neutral-100">
+                                        Menampilkan 50 model pertama. Ketik lebih spesifik untuk mempersempit.
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Jika model sedikit (<= 12 items), tampilkan juga tombol kartu cepat di bawahnya --}}
+                            @if (count($available_models) <= 12)
+                                <div class="pt-2">
+                                    <span class="text-xs font-bold text-neutral-500 mb-2 block">Atau pilih langsung dari daftar:</span>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                                        @foreach ($available_models as $m)
+                                            <button type="button" wire:click="selectProduct({{ $m['id'] }})"
+                                                class="p-3.5 rounded-2xl border border-neutral-200/80 bg-neutral-50/40 hover:bg-white hover:border-[#D3AD7B] hover:shadow-xs transition-all text-left flex flex-col justify-between group cursor-pointer">
+                                                <span class="font-bold text-xs text-neutral-800 group-hover:text-[#A28153] leading-snug line-clamp-2">
+                                                    {{ $m['name'] }}
+                                                </span>
+                                                <div class="mt-2 pt-1.5 border-t border-neutral-200/50 flex items-center justify-between text-[11px]">
+                                                    <span class="text-neutral-400 font-mono">{{ $m['item_no'] }}</span>
+                                                    <span class="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                        {{ $m['formatted_price'] }}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        @else
+                            <div class="p-6 text-center text-xs text-neutral-400 bg-neutral-50 rounded-2xl border border-neutral-200">
+                                {{ count($available_proyek) > 0 ? 'Pilih proyek/kondisi pada Langkah 3 untuk memuat model HP.' : 'Tidak ada model pada kategori ini.' }}
+                            </div>
+                        @endif
+                    </div>
+                @endif
             @endif
 
         @else

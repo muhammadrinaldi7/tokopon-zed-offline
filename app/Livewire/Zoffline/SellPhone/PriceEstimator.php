@@ -133,7 +133,7 @@ class PriceEstimator extends Component
 
         if ($this->selected_brand_id) {
             $this->loadCategories();
-            $this->loadModels();
+            // Catatan performa: Jangan loadModels() di sini agar transisi klik brand secepat kilat (<20ms)
         }
     }
 
@@ -177,11 +177,12 @@ class PriceEstimator extends Component
 
         $this->resetProductData();
 
-        if ($this->selected_brand_id) {
-            if ($this->selected_categoryName) {
-                $this->loadProyeks();
+        if ($this->selected_brand_id && $this->selected_categoryName) {
+            $this->loadProyeks();
+            // Jika kategori ini tidak memiliki pemisahan proyek khusus, langsung muat daftar modelnya
+            if (empty($this->available_proyek)) {
+                $this->loadModels();
             }
-            $this->loadModels();
         }
     }
 
@@ -253,7 +254,7 @@ class PriceEstimator extends Component
         $this->available_models = $query
             ->orderByRaw('CASE WHEN buy_price > 0 THEN 0 ELSE 1 END')
             ->orderBy('name')
-            ->get()
+            ->get(['id', 'name', 'item_no', 'buy_price', 'base_price'])
             ->map(function ($device) {
                 $buyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : $device->base_price);
                 return [
@@ -644,8 +645,8 @@ class PriceEstimator extends Component
         return $query
             ->orderByRaw('CASE WHEN buy_price > 0 THEN 0 ELSE 1 END')
             ->orderBy('name')
-            ->limit(20)
-            ->get()
+            ->limit(15)
+            ->get(['id', 'name', 'brandName', 'categoryName', 'proyek', 'buy_price', 'base_price'])
             ->map(function ($device) {
                 $buyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : $device->base_price);
                 return [
