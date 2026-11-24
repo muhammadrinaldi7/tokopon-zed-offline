@@ -66,6 +66,14 @@ Route::prefix('v1/public/trade-in')->middleware('throttle:60,1')->group(function
 });
 
 // ============================================
+// PUBLIC KREDIVO INSTALLMENT SIMULATION API
+// ============================================
+Route::prefix('v1/public/kredivo')->middleware('throttle:60,1')->group(function () {
+    Route::get('/simulate', [\App\Http\Controllers\Api\PublicKredivoController::class, 'simulate'])
+        ->name('api.public.kredivo.simulate');
+});
+
+// ============================================
 // EXECUTIVE & DIRECTORS API (STAGE 1)
 // ============================================
 Route::prefix('v1/executive')->group(function () {

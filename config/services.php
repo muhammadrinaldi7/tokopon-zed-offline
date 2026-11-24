@@ -73,4 +73,9 @@ return [
         'auto_send_sellphone' => env('CRM_WA_AUTO_SEND_SELLPHONE', true),
     ],
 
+    'kredivo' => [
+        'server_key' => env('INSTALLMENT_SERVER_KEY', '8tLHIx8V0N6KtnSpS9Nbd6zROFFJH7'),
+        'base_url' => env('KREDIVO_BASE_URL', 'https://sandbox.kredivo.com/kredivo/v2/payments'),
+    ],
+
 ];
