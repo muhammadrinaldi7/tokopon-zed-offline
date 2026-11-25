@@ -2106,12 +2106,12 @@ class AccurateService
 
                 // Jika order saat ini adalah order pengganti (WR-xxx), telusuri ke order asli untuk mencari pembayaran finance
                 if (!$financePayment && str_starts_with($order->order_number, 'WR-')) {
-                    $originalSerial = $claim->warranty->serialLogs()->orderBy('id', 'asc')->value('old_serial_number') 
+                    $originalSerial = $claim->warranty->serialLogs()->orderBy('id', 'asc')->value('old_serial_number')
                         ?: $claim->warranty->serial_number;
-                    
+
                     $rootOrder = \App\Models\Order::whereHas('items', function ($q) use ($originalSerial) {
-                            $q->where('serial_number', $originalSerial);
-                        })
+                        $q->where('serial_number', $originalSerial);
+                    })
                         ->where('order_number', 'not like', 'WR-%')
                         ->first();
 
@@ -2701,10 +2701,22 @@ class AccurateService
             Log::warning("postSalesReturnDownPayment SO {$order->order_number}: Gagal fetch SI detail {$dpInvoiceNo}: " . $e->getMessage());
         }
 
+        $returnAmount = (float)($amount ?? 0);
+        if ($returnAmount <= 0) {
+            $returnAmount = (float)($order->down_payment ?? 0);
+        }
+        if ($returnAmount <= 0 && !empty($invDetail['availableDownPayment'])) {
+            $returnAmount = (float)$invDetail['availableDownPayment'];
+        }
+        if ($returnAmount <= 0 && !empty($invDetail['totalAmount'])) {
+            $returnAmount = (float)$invDetail['totalAmount'];
+        }
+
         $payload = [
             'customerNo' => $customerNo,
-            'returnType' => 'DOWN_PAYMENT',
+            'returnType' => 'INVOICE_DP',
             'invoiceNumber' => $dpInvoiceNo,
+            'returnDownPayment' => $returnAmount,
             'transDate' => $actualTransDate,
             'returnDate' => $actualTransDate,
             'taxDate' => $actualTransDate,
@@ -2774,7 +2786,7 @@ class AccurateService
                         'doc_type' => 'SALES_RETURN',
                         'doc_number' => $returnNo,
                         'accurate_id' => $returnId,
-                        'amount' => (float)($customAmount ?? 0),
+                        'amount' => (float)($customAmount ?? ($returnResult['r']['totalAmount'] ?? ($order->down_payment ?? 0))),
                         'status' => 'SUCCESS',
                     ]);
                     Log::info("refundDownPayment SO {$order->order_number}: Berhasil membuat SALES_RETURN {$returnNo}.");
