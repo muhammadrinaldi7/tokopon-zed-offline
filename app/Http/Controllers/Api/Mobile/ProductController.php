@@ -65,7 +65,7 @@ class ProductController extends Controller
     {
         $filters = $this->extractFilters($request);
         $ctx = $this->resolveWarehouseContext($filters);
-        $perPage = max(1, min((int) ($request->query('per_page', 20)), 50));
+        $perPage = max(1, min((int) ($request->query('per_page', $request->query('limit', 20))), 50));
 
         if ($filters['in_stock_only'] && empty($ctx['filter_warehouse_ids'])) {
             return response()->json([
@@ -643,7 +643,14 @@ class ProductController extends Controller
             $condition = null;
         }
 
-        $sort = strtolower(trim((string) $request->query('sort', 'latest')));
+        $rawSort = strtolower(trim((string) $request->query('sort', 'latest')));
+        // Alias backward-compatible untuk build Mobile App lama
+        $sortAliases = [
+            'price_low' => 'price_asc',
+            'price_high' => 'price_desc',
+            'popular' => 'best_seller',
+        ];
+        $sort = $sortAliases[$rawSort] ?? $rawSort;
         $allowedSorts = ['latest', 'price_asc', 'price_desc', 'name_asc', 'name_desc', 'stock_desc', 'best_seller'];
         if (!in_array($sort, $allowedSorts, true)) {
             $sort = 'latest';
