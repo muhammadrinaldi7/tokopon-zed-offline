@@ -2678,7 +2678,55 @@ class AccurateService
     }
 
     /**
+     * Membuat dokumen Retur Penjualan Uang Muka (Sales Return DP) di Accurate
+     */
+    public function postSalesReturnDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $amount = null, $transDate = null)
+    {
+        $rawBranchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? ($order->branch->name ?? 'Cabang Utama');
+        $bu = $order->businessUnit ?: \App\Models\BusinessUnit::where('code', $dbSource)->first();
+        $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
+        $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
+        $actualTransDate = $transDate ? \Carbon\Carbon::parse($transDate)->format('d/m/Y') : now()->format('d/m/Y');
+
+        // Upayakan mengambil customerNo & branchName persis dari faktur uang muka terkait di Accurate
+        try {
+            $invDetail = $this->getSalesInvoiceDetail($dpInvoiceNo, $dbSource);
+            if (!empty($invDetail['customer']['customerNo'])) {
+                $customerNo = $invDetail['customer']['customerNo'];
+            }
+            if (!empty($invDetail['branch']['name'])) {
+                $branchName = $invDetail['branch']['name'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning("postSalesReturnDownPayment SO {$order->order_number}: Gagal fetch SI detail {$dpInvoiceNo}: " . $e->getMessage());
+        }
+
+        $payload = [
+            'customerNo' => $customerNo,
+            'returnType' => 'DOWN_PAYMENT',
+            'invoiceNumber' => $dpInvoiceNo,
+            'transDate' => $actualTransDate,
+            'returnDate' => $actualTransDate,
+            'taxDate' => $actualTransDate,
+            'branchName' => $branchName,
+            'taxable' => false,
+            'inclusiveTax' => false,
+            'description' => "Retur Uang Muka Pembatalan SO: {$order->order_number} (Faktur DP: {$dpInvoiceNo})",
+        ];
+
+        Log::info("Payload Sales Return Down Payment SO {$order->order_number}:", $payload);
+
+        $result = $this->postSalesReturn($payload, $dbSource);
+        Log::info("Response Sales Return Down Payment SO {$order->order_number}:", $result);
+
+        return $result;
+    }
+
+    /**
      * Memproses pengembalian uang muka (Refund DP) ke customer akibat pembatalan SO
+     * Menggunakan alur 2-Step otomatis:
+     * 1. Terbitkan Retur Uang Muka (sales-return) agar Faktur DP tertutup dan berstatus LUNAS.
+     * 2. Catat pengeluaran kas/bank (sales-receipt minus) agar kas keluar riil tercatat.
      */
     public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null, $transDate = null)
     {
@@ -2688,6 +2736,59 @@ class AccurateService
         $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
         $actualTransDate = $transDate ? \Carbon\Carbon::parse($transDate)->format('d/m/Y') : now()->format('d/m/Y');
 
+        // Upayakan sinkronisasi customerNo & branchName persis dari faktur DP di Accurate
+        try {
+            $invDetail = $this->getSalesInvoiceDetail($dpInvoiceNo, $dbSource);
+            if (!empty($invDetail['customer']['customerNo'])) {
+                $customerNo = $invDetail['customer']['customerNo'];
+            }
+            if (!empty($invDetail['branch']['name'])) {
+                $branchName = $invDetail['branch']['name'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning("refundDownPayment SO {$order->order_number}: Gagal fetch SI detail {$dpInvoiceNo}: " . $e->getMessage());
+        }
+
+        // --- STEP 1: Buat Dokumen Retur Uang Muka (Sales Return DP) ---
+        // Cek apakah sudah pernah dibuat dokumen SALES_RETURN untuk order ini
+        $existingReturnDoc = \App\Models\OrderAccurateDoc::where('order_id', $order->id)
+            ->where('doc_type', 'SALES_RETURN')
+            ->first();
+
+        $returnDoc = null;
+        $returnNo = null;
+
+        if ($existingReturnDoc) {
+            $returnDoc = $existingReturnDoc;
+            $returnNo = $existingReturnDoc->doc_number;
+            Log::info("refundDownPayment SO {$order->order_number}: Dokumen SALES_RETURN sudah ada ({$returnNo}), melewati Step 1.");
+        } else {
+            try {
+                $returnResult = $this->postSalesReturnDownPayment($order, $dpInvoiceNo, $dbSource, $customAmount, $transDate);
+                $returnNo = $returnResult['r']['number'] ?? null;
+                $returnId = $returnResult['r']['id'] ?? null;
+
+                if ($returnNo) {
+                    $returnDoc = \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'SALES_RETURN',
+                        'doc_number' => $returnNo,
+                        'accurate_id' => $returnId,
+                        'amount' => (float)($customAmount ?? 0),
+                        'status' => 'SUCCESS',
+                    ]);
+                    Log::info("refundDownPayment SO {$order->order_number}: Berhasil membuat SALES_RETURN {$returnNo}.");
+                }
+            } catch (\Exception $e) {
+                Log::error("refundDownPayment SO {$order->order_number}: Gagal membuat Retur Uang Muka: " . $e->getMessage());
+                // Jika error adalah karena retur sudah pernah dibuat di Accurate, jangan hentikan
+                if (stripos($e->getMessage(), 'sudah ada') === false && stripos($e->getMessage(), 'already exists') === false) {
+                    throw new \Exception("Gagal membuat Retur Uang Muka di Accurate: " . $e->getMessage());
+                }
+            }
+        }
+
+        // --- STEP 2: Catat Pengeluaran Kas/Bank (Sales Receipt Minus) ---
         // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
         if (!empty($customBankNo) && $customAmount !== null) {
             $refundAmount = (float)$customAmount;
@@ -2702,7 +2803,7 @@ class AccurateService
                 'branchName' => $branchName,
                 'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
                 'useCredit' => false,
-                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number} (Faktur DP: {$dpInvoiceNo})",
                 'detailInvoice' => [
                     [
                         'invoiceNo' => $dpInvoiceNo,
@@ -2715,7 +2816,7 @@ class AccurateService
 
             $result = $this->postSalesReceipt($receiptPayload, $dbSource);
             if (isset($result['r']['number'])) {
-                return \App\Models\OrderAccurateDoc::create([
+                $receiptDoc = \App\Models\OrderAccurateDoc::create([
                     'order_id' => $order->id,
                     'doc_type' => 'DP_REFUND',
                     'doc_number' => $result['r']['number'],
@@ -2723,9 +2824,16 @@ class AccurateService
                     'amount' => -$refundAmount,
                     'status' => 'SUCCESS',
                 ]);
+
+                return [
+                    'sales_return' => $returnDoc,
+                    'sales_receipt' => $receiptDoc,
+                    'sales_return_no' => $returnNo,
+                    'sales_receipt_no' => $result['r']['number'],
+                ];
             } else {
                 $err = $result['d'][0] ?? json_encode($result);
-                throw new \Exception("Gagal mencatat Refund DP di Accurate: {$err}");
+                throw new \Exception("Gagal mencatat Pengeluaran Kas Refund DP di Accurate: {$err}");
             }
         }
 
@@ -2733,15 +2841,18 @@ class AccurateService
         Log::warning("refundDownPayment SO {$order->order_number}: customBankNo kosong, beralih ke fallback akun kas/bank pembayaran historis.");
         $payments = $order->payments()->where('status', 'PAID')->get();
         if ($payments->isEmpty()) {
-            return;
+            return [
+                'sales_return' => $returnDoc,
+                'sales_return_no' => $returnNo,
+            ];
         }
 
+        $receiptDocs = [];
         foreach ($payments as $payment) {
             $refundAmount = (float)$payment->amount;
             if ($refundAmount <= 0) continue;
 
             $pm = $payment->paymentMethod;
-            // Gunakan bank asal uang tersebut masuk (sesuai pilihan User: "Gunakan otomatis akun Bank/Kas asal pada saat DP tersebut dibayarkan")
             $bankNo = $pm->accurate_bank_no ?? 'KAS-CASH';
 
             $receiptPayload = [
@@ -2751,7 +2862,7 @@ class AccurateService
                 'branchName' => $branchName,
                 'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
                 'useCredit' => false,
-                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number} (Faktur DP: {$dpInvoiceNo})",
                 'detailInvoice' => [
                     [
                         'invoiceNo' => $dpInvoiceNo,
@@ -2765,7 +2876,7 @@ class AccurateService
             try {
                 $result = $this->postSalesReceipt($receiptPayload, $dbSource);
                 if (isset($result['r']['number'])) {
-                    \App\Models\OrderAccurateDoc::create([
+                    $receiptDocs[] = \App\Models\OrderAccurateDoc::create([
                         'order_id' => $order->id,
                         'doc_type' => 'DP_REFUND',
                         'doc_number' => $result['r']['number'],
@@ -2779,6 +2890,12 @@ class AccurateService
                 // Jangan me-lempar error agar proses rollback (penghapusan DO/SI) tetap bisa berjalan
             }
         }
+
+        return [
+            'sales_return' => $returnDoc,
+            'sales_return_no' => $returnNo,
+            'sales_receipts' => $receiptDocs,
+        ];
     }
 
     /**

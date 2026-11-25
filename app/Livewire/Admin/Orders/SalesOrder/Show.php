@@ -1020,9 +1020,10 @@ class Show extends Component
                 $receiptPath = $this->refundReceipt->store('finance/dp_refunds', 'public');
             }
 
+            $refundResult = null;
             // 2. Sinkronkan ke Accurate jika deposit memiliki invoice DP Accurate
             if (!empty($deposit->accurate_invoice_no)) {
-                $accurateService->refundDownPayment(
+                $refundResult = $accurateService->refundDownPayment(
                     $this->order,
                     $deposit->accurate_invoice_no,
                     $dbSource,
@@ -1039,8 +1040,12 @@ class Show extends Component
             $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
             $refundDateTime = Carbon::parse($this->refundDate)->setTimeFrom(now());
 
+            $returnInfo = !empty($refundResult['sales_return_no']) ? " | Retur: " . $refundResult['sales_return_no'] : "";
+            $receiptInfo = !empty($refundResult['sales_receipt_no']) ? " | Kwitansi: " . $refundResult['sales_receipt_no'] : "";
+
             $noteDetails = "\n[" . Carbon::parse($this->refundDate)->format('Y-m-d') . "] REFUND DANA: Rp " . number_format($this->refundAmount, 0, ',', '.') .
                 " via Kas/Bank: " . $this->refundBankNo .
+                $returnInfo . $receiptInfo .
                 ($this->refundCustomerBankName ? " ke " . $this->refundCustomerBankName . " No: " . $this->refundCustomerAccountNo . " a/n " . $this->refundCustomerAccountName : '') .
                 ($this->refundNotes ? " (" . $this->refundNotes . ")" : "");
 
@@ -1060,7 +1065,7 @@ class Show extends Component
 
             $this->showRefundDpModal = false;
             $this->order->refresh();
-            $this->dispatch('toast', title: 'Berhasil', message: 'Refund DP berhasil diproses dan disinkronkan ke Accurate.', type: 'success');
+            $this->dispatch('toast', title: 'Berhasil', message: 'Refund DP berhasil diproses! Faktur Uang Muka telah diretur dan dilunaskan di Accurate.', type: 'success');
             $this->dispatch('refreshOrderDetails');
         } catch (\Exception $e) {
             DB::rollBack();

@@ -484,7 +484,28 @@
                                         </div>
                                     @endif
 
-                                    @php $dpRefundDoc = $order->accurateDocs->where('doc_type', 'DP_REFUND')->where('status', 'SUCCESS')->first(); @endphp
+                                    @php 
+                                        $srReturnDoc = $order->accurateDocs->where('doc_type', 'SALES_RETURN')->where('status', 'SUCCESS')->first();
+                                        $dpRefundDoc = $order->accurateDocs->where('doc_type', 'DP_REFUND')->where('status', 'SUCCESS')->first(); 
+                                    @endphp
+                                    @if ($srReturnDoc)
+                                        {{-- Node: Retur Uang Muka --}}
+                                        <div id="node-dp-return-{{ $idx }}"
+                                            data-parent="node-dp-inv-{{ $idx }}"
+                                            class="node-dp-return w-48 bg-amber-50 border-2 border-amber-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow"
+                                            style="z-index: 10;">
+                                            <div class="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">
+                                                Retur UM (Accurate)</div>
+                                            <div class="text-[10px] font-semibold text-amber-900 mb-1">
+                                                {{ $srReturnDoc->doc_number }}
+                                            </div>
+                                            <div class="text-xs font-bold text-amber-800 mb-1">
+                                                Rp {{ number_format($srReturnDoc->amount, 0, ',', '.') }}</div>
+                                            <div class="text-[10px] text-gray-500">
+                                                {{ $srReturnDoc->created_at->format('d/m/Y H:i') }}
+                                            </div>
+                                        </div>
+                                    @endif
                                     @if ($dpRefundDoc)
                                         {{-- Node: DP Refund --}}
                                         <div id="node-dp-refund-{{ $idx }}"
