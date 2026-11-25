@@ -81,13 +81,15 @@ class Show extends Component
         if ($user) {
             $isAdmin = $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
             $isMo = !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
-            $isBranchLocked = !$isAdmin && !$isMo;
+            $isKpiAdmin = !$isAdmin && $user->hasRole('kpi_admin');
+            $isBusinessUnitScoped = $isMo || $isKpiAdmin;
+            $isBranchLocked = !$isAdmin && !$isBusinessUnitScoped;
 
             if ($isBranchLocked && $order->branch_id && $order->branch_id != $user->branch_id) {
                 abort(403, 'Akses Ditolak: Anda hanya memiliki akses untuk Sales Order di cabang Anda.');
             }
 
-            if ($isMo) {
+            if ($isBusinessUnitScoped) {
                 $userBuId = $user->business_unit_id ?? $user->getActiveBusinessUnitId();
                 if ($order->business_unit_id && $userBuId && $order->business_unit_id != $userBuId) {
                     abort(403, 'Akses Ditolak: Anda hanya memiliki akses untuk Sales Order di unit bisnis Anda.');

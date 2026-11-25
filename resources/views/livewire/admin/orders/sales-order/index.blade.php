@@ -15,28 +15,40 @@
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         {{-- Role Scoping Notice / Badge --}}
-        <div class="mb-5 flex flex-wrap items-center justify-between gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-150">
+        <div
+            class="mb-5 flex flex-wrap items-center justify-between gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-150">
             <div class="flex items-center gap-2">
                 @if ($isBranchLocked)
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-lg border border-amber-200">
-                        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-lg border border-amber-200">
+                        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Akses Cabang: <span class="font-bold underline">{{ $userBranch->name ?? 'Cabang Anda' }}</span> ({{ $userBu->name ?? 'Unit Bisnis Anda' }})
+                        Akses Cabang: <span class="font-bold underline">{{ $userBranch->name ?? 'Cabang Anda' }}</span>
+                        ({{ $userBu->name ?? 'Unit Bisnis Anda' }})
                     </span>
                     <span class="text-xs text-neutral-400">Data otomatis dibatasi untuk cabang Anda.</span>
-                @elseif ($isMo)
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200">
-                        <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                @elseif ($isMo || $isKpiAdmin)
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200">
+                        <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
-                        Manager Operasional: <span class="font-bold underline">{{ $userBu->name ?? 'Unit Bisnis Anda' }}</span>
+                        {{ $isKpiAdmin ? 'KPI Admin' : 'Manager Operasional' }}: <span
+                            class="font-bold underline">{{ $userBu->name ?? 'Unit Bisnis Anda' }}</span>
                     </span>
                     <span class="text-xs text-neutral-400">Dapat memantau semua cabang di unit bisnis Anda.</span>
                 @else
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg border border-purple-200">
-                        <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg border border-purple-200">
+                        <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                         Akses Administrator: Semua Unit Bisnis & Cabang
                     </span>
@@ -79,9 +91,11 @@
                             class="p-2.5 w-full rounded-xl border-gray-200 text-sm bg-gray-50 text-gray-500 cursor-not-allowed shadow-sm pl-8">
                             <option selected>{{ $userBu->name ?? 'Unit Bisnis Anda' }}</option>
                         </select>
-                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+                        <div
+                            class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
                         </div>
                     </div>
@@ -96,9 +110,11 @@
                             class="p-2.5 w-full rounded-xl border-gray-200 text-sm bg-gray-50 text-gray-500 cursor-not-allowed shadow-sm pl-8">
                             <option selected>{{ $userBranch->name ?? 'Cabang Anda' }}</option>
                         </select>
-                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+                        <div
+                            class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
                         </div>
                     </div>
@@ -142,7 +158,8 @@
                     class="w-full h-full min-h-[42px] px-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl transition-colors flex items-center justify-center gap-1 text-xs font-semibold shadow-sm"
                     title="Reset Filter">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span>Reset</span>
                 </button>
@@ -167,17 +184,26 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="p-4">
                                 @php
-                                    $lockedCount = $order->items ? $order->items->sum(function($item) {
-                                        return !empty(trim((string)$item->serial_number)) ? count(array_filter(array_map('trim', explode(',', $item->serial_number)))) : 0;
-                                    }) : 0;
+                                    $lockedCount = $order->items
+                                        ? $order->items->sum(function ($item) {
+                                            return !empty(trim((string) $item->serial_number))
+                                                ? count(
+                                                    array_filter(array_map('trim', explode(',', $item->serial_number))),
+                                                )
+                                                : 0;
+                                        })
+                                        : 0;
                                 @endphp
                                 <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="font-bold text-[#1c69d4]">{{ $order->order_number }}</span>
                                     @if ($lockedCount > 0)
-                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold rounded-md border border-amber-300 shadow-2xs"
+                                        <span
+                                            class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold rounded-md border border-amber-300 shadow-2xs"
                                             title="Keep IMEI: {{ $lockedCount }} Unit Terkunci">
-                                            <svg class="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            <svg class="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                             </svg>
                                             Keep IMEI ({{ $lockedCount }})
                                         </span>
@@ -191,7 +217,8 @@
                             <td class="p-4">
                                 <div class="font-medium text-gray-800">{{ $order->branch->name ?? 'Unknown' }}</div>
                                 @if ($order->businessUnit)
-                                    <span class="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded {{ $order->business_unit_id == 1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
+                                    <span
+                                        class="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded {{ $order->business_unit_id == 1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
                                         {{ $order->businessUnit->name }}
                                     </span>
                                 @endif
@@ -203,7 +230,8 @@
                                 <div class="font-bold text-gray-800">{{ $order->user->name ?? 'Unknown' }}</div>
                                 <div class="text-[10px] text-gray-400">{{ $order->user->email ?? '' }}</div>
                                 @if ($order->salesBy)
-                                    <div class="text-[10px] text-indigo-600 font-semibold mt-0.5">Sales: {{ $order->salesBy->name }}</div>
+                                    <div class="text-[10px] text-indigo-600 font-semibold mt-0.5">Sales:
+                                        {{ $order->salesBy->name }}</div>
                                 @endif
                             </td>
                             <td class="p-4 font-bold text-gray-800">Rp
@@ -277,8 +305,8 @@
                                 @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->exists())
                                     <span title="Menunggu Approval Batal"
                                         class="inline-flex items-center justify-center p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 ml-1">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
@@ -291,8 +319,8 @@
                                         @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
                                         class="inline-flex items-center justify-center p-2 bg-white border border-gray-200 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors shadow-sm ml-1"
                                         title="Batalkan Transaksi">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M6 18L18 6M6 6l12 12" />
                                         </svg>

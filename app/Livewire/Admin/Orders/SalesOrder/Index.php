@@ -29,14 +29,15 @@ class Index extends Component
 
         $isAdmin = $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
         $isMo = !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
+        $isKpiAdmin = !$isAdmin && $user->hasRole('kpi_admin');
 
         if ($isAdmin) {
             // Sesuai active business unit id
             $activeBu = $user->getActiveBusinessUnitId();
             $this->filterBusinessUnitId = $activeBu ? (string) $activeBu : '';
             $this->filterBranchId = '';
-        } elseif ($isMo) {
-            // MO terkunci ke unit bisnisnya, bebas pilih cabang
+        } elseif ($isMo || $isKpiAdmin) {
+            // MO dan KPI Admin terkunci ke unit bisnisnya, bebas pilih cabang
             $this->filterBusinessUnitId = (string) ($user->business_unit_id ?? $user->getActiveBusinessUnitId() ?? '');
             $this->filterBranchId = '';
         } else {
@@ -70,9 +71,10 @@ class Index extends Component
         $user = Auth::user();
         $isAdmin = $user && $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
         $isMo = $user && !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
+        $isKpiAdmin = $user && !$isAdmin && $user->hasRole('kpi_admin');
 
         // Jika Kasir/FL/BM, jangan biarkan ubah cabang
-        if (!$isAdmin && !$isMo) {
+        if (!$isAdmin && !$isMo && !$isKpiAdmin) {
             $this->filterBranchId = (string) ($user->branch_id ?? '');
         }
 
@@ -94,6 +96,7 @@ class Index extends Component
         $user = Auth::user();
         $isAdmin = $user && $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
         $isMo = $user && !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
+        $isKpiAdmin = $user && !$isAdmin && $user->hasRole('kpi_admin');
 
         $this->search = '';
         $this->filterImeiStatus = '';
@@ -103,7 +106,7 @@ class Index extends Component
             $activeBu = $user->getActiveBusinessUnitId();
             $this->filterBusinessUnitId = $activeBu ? (string) $activeBu : '';
             $this->filterBranchId = '';
-        } elseif ($isMo) {
+        } elseif ($isMo || $isKpiAdmin) {
             $this->filterBusinessUnitId = (string) ($user->business_unit_id ?? $user->getActiveBusinessUnitId() ?? '');
             $this->filterBranchId = '';
         } else {
@@ -125,7 +128,9 @@ class Index extends Component
         $user = Auth::user();
         $isAdmin = $user && $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
         $isMo = $user && !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
-        $isBranchLocked = !$isAdmin && !$isMo;
+        $isKpiAdmin = $user && !$isAdmin && $user->hasRole('kpi_admin');
+        $isBusinessUnitScoped = $isMo || $isKpiAdmin;
+        $isBranchLocked = !$isAdmin && !$isBusinessUnitScoped;
 
         // Opsi Business Unit & Branch untuk filter dropdown
         $businessUnits = BusinessUnit::where('is_active', true)->orderBy('name')->get();
@@ -133,7 +138,7 @@ class Index extends Component
         $branchQuery = Branch::query()->orderBy('name');
         if ($isBranchLocked) {
             $branchQuery->where('id', $user->branch_id ?? 0);
-        } elseif ($isMo) {
+        } elseif ($isBusinessUnitScoped) {
             $moBuId = $user->business_unit_id ?? $user->getActiveBusinessUnitId();
             if ($moBuId) {
                 $branchQuery->where('business_unit_id', $moBuId);
@@ -175,8 +180,8 @@ class Index extends Component
             if ($user && $user->business_unit_id) {
                 $ordersQuery->where('business_unit_id', $user->business_unit_id);
             }
-        } elseif ($isMo) {
-            // MO bisa lihat semua cabang sesuai unit bisnisnya
+        } elseif ($isBusinessUnitScoped) {
+            // MO dan KPI Admin bisa lihat semua cabang sesuai unit bisnisnya
             $moBuId = $user->business_unit_id ?? $user->getActiveBusinessUnitId();
             if ($moBuId) {
                 $ordersQuery->where('business_unit_id', $moBuId);
@@ -202,7 +207,7 @@ class Index extends Component
                     ->orWhere('accurate_so_number', 'like', '%' . $term . '%')
                     ->orWhereHas('user', function ($q2) use ($term) {
                         $q2->where('name', 'like', '%' . $term . '%')
-                           ->orWhere('email', 'like', '%' . $term . '%');
+                            ->orWhere('email', 'like', '%' . $term . '%');
                     });
             });
         });
@@ -215,10 +220,10 @@ class Index extends Component
             'branches' => $branches,
             'isAdmin' => $isAdmin,
             'isMo' => $isMo,
+            'isKpiAdmin' => $isKpiAdmin,
             'isBranchLocked' => $isBranchLocked,
             'userBranch' => $user?->branch,
             'userBu' => $user?->businessUnit,
         ])->layout('layouts.z');
     }
 }
-
