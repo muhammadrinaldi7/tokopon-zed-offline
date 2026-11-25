@@ -156,7 +156,15 @@
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            Verifikasi
+                                            Verifikasi (SO)
+                                        </button>
+                                    @elseif ($order->order_status === 'PROCESSING' && $order->order_channel === 'MOBILE_APP')
+                                        <button wire:click="openVerification({{ $order->id }})"
+                                            class="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Alokasi &amp; Kirim (SI)
                                         </button>
                                     @elseif ($order->order_status === 'WAITING_PAYMENT')
                                         <button wire:click="updateOrderStatus({{ $order->id }}, 'CANCELLED')"
@@ -412,9 +420,48 @@
                         </div>
                     </div>
 
+                    <!-- Info Mode Pemenuhan & Status SO Accurate -->
+                    @php
+                        $isFulfillmentStage = $selectedMobileOrder->order_status === 'PROCESSING';
+                        $isPickupMode = $selectedMobileOrder->fulfillment_type === 'PICK_UP';
+                    @endphp
+                    <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border {{ $isFulfillmentStage ? 'bg-indigo-50 border-indigo-200' : 'bg-amber-50 border-amber-200' }} text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-1 rounded-lg font-black uppercase {{ $isPickupMode ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800' }}">
+                                {{ $isPickupMode ? 'STORE PICK UP' : 'DELIVERY' }}
+                            </span>
+                            @if ($isPickupMode && $selectedMobileOrder->pickupWarehouse)
+                                <span class="font-bold text-gray-800">Cabang Ambil: {{ $selectedMobileOrder->pickupWarehouse->name }}</span>
+                            @else
+                                <span class="font-medium text-gray-600">Boleh kirim langsung dari cabang mana saja yang tersedia</span>
+                            @endif
+                        </div>
+                        <div class="font-mono font-bold {{ $selectedMobileOrder->accurate_so_number ? 'text-emerald-700' : 'text-amber-700' }}">
+                            {{ $selectedMobileOrder->accurate_so_number ? 'SO Accurate: ' . $selectedMobileOrder->accurate_so_number : 'Tahap 1: Verifikasi Lunas -> Buat SO' }}
+                        </div>
+                    </div>
+
+                    @if ($isFulfillmentStage && !$isPickupMode)
+                        <!-- Input Kurir & Resi (Khusus Fulfillment Delivery, disimpan ke tabel order_shippings) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-purple-50/60 border border-purple-100 rounded-xl p-4">
+                            <div>
+                                <label class="block text-xs font-bold text-purple-900 mb-1">Kurir / Ekspedisi (Opsional)</label>
+                                <input type="text" wire:model="fulfillmentCourierCompany" placeholder="Contoh: JNE, J&T, Kurir Toko"
+                                    class="w-full text-xs font-semibold rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-purple-900 mb-1">Nomor Resi Pengiriman (Opsional)</label>
+                                <input type="text" wire:model="fulfillmentTrackingNumber" placeholder="Masukkan no resi jika sudah ada..."
+                                    class="w-full text-xs font-mono font-semibold rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-white">
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Item Pesanan & Alokasi Nomor Seri -->
                     <div>
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Produk & Alokasi Nomor Seri / IMEI</h4>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                            {{ $isFulfillmentStage ? 'Alokasi Fisik & Scan Nomor Seri / IMEI (Wajib untuk Barang ber-SN)' : 'Daftar Item Pesanan (IMEI belum wajib pada tahap Verifikasi / SO)' }}
+                        </h4>
                         <div class="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
                             @foreach ($selectedMobileOrder->items as $item)
                                 <div class="p-3.5 space-y-2">
@@ -428,35 +475,41 @@
                                         </div>
                                     </div>
 
-                                    <!-- Input SN / IMEI -->
-                                    <div class="bg-gray-50/80 p-2.5 rounded-lg border border-gray-200 space-y-1.5">
-                                        <div class="flex items-center justify-between">
-                                            <label class="text-xs font-bold text-gray-700">Nomor Seri / IMEI yang Dikirim:</label>
-                                            @if ($item->serial_number)
-                                                <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                                    Status: Ter-reservasi
-                                                </span>
+                                    @if ($isFulfillmentStage)
+                                        <!-- Input SN / IMEI (Hanya di Tahap 2: Fulfillment -> Terbitkan SI) -->
+                                        <div class="bg-gray-50/80 p-2.5 rounded-lg border border-gray-200 space-y-1.5">
+                                            <div class="flex items-center justify-between">
+                                                <label class="text-xs font-bold text-gray-700">Nomor Seri / IMEI Aktual yang Dikirim:</label>
+                                                @if ($item->serial_number)
+                                                    <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                        Unit Pilihan Customer / Terisi
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <input type="text"
+                                                wire:model="verificationItemSns.{{ $item->id }}"
+                                                placeholder="Scan atau ketik IMEI / SN aktual (pisahkan koma jika qty > 1)..."
+                                                class="w-full text-xs font-mono font-semibold rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+
+                                            @if (!empty($availableSns[$item->id]))
+                                                <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                                                    <span class="text-[10px] font-semibold text-gray-500">SN Tersedia di Gudang Terpilih:</span>
+                                                    @foreach ($availableSns[$item->id] as $snOpt)
+                                                        <button type="button"
+                                                            wire:click="setItemSn({{ $item->id }}, '{{ $snOpt }}')"
+                                                            class="px-2 py-0.5 text-[11px] font-mono bg-white border border-indigo-200 text-indigo-700 rounded hover:bg-indigo-50 hover:border-indigo-400 transition"
+                                                            title="Klik untuk memasang nomor seri ini">
+                                                            {{ $snOpt }}
+                                                        </button>
+                                                    @endforeach
+                                                </div>
                                             @endif
                                         </div>
-                                        <input type="text"
-                                            wire:model="verificationItemSns.{{ $item->id }}"
-                                            placeholder="Ketik atau pilih IMEI / SN..."
-                                            class="w-full text-xs font-mono font-semibold rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
-
-                                        @if (!empty($availableSns[$item->id]))
-                                            <div class="flex flex-wrap items-center gap-1.5 pt-1">
-                                                <span class="text-[10px] font-semibold text-gray-500">Unit Tersedia di Gudang ini:</span>
-                                                @foreach ($availableSns[$item->id] as $snOpt)
-                                                    <button type="button"
-                                                        wire:click="setItemSn({{ $item->id }}, '{{ $snOpt }}')"
-                                                        class="px-2 py-0.5 text-[11px] font-mono bg-white border border-indigo-200 text-indigo-700 rounded hover:bg-indigo-50 hover:border-indigo-400 transition"
-                                                        title="Klik untuk memasang nomor seri ini">
-                                                        {{ $snOpt }}
-                                                    </button>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
+                                    @elseif ($item->serial_number)
+                                        <div class="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                                            Unit Pilihan Customer (GSK Second): <strong>{{ $item->serial_number }}</strong>
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -466,23 +519,34 @@
                 <!-- Modal Footer Actions -->
                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
                     <button wire:click="rejectMobilePayment({{ $selectedMobileOrder->id }})"
-                        wire:confirm="Yakin ingin MENOLAK bukti transfer dan membatalkan pesanan ini? Stok dan nomor seri akan dikembalikan ke status Available."
+                        wire:confirm="Yakin ingin membatalkan pesanan ini? Reservasi stok akan dilepas dan SO Accurate (jika ada) akan ditutup."
                         class="px-4 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-sm rounded-xl transition">
-                        Tolak & Batalkan Pesanan
+                        Batalkan Pesanan
                     </button>
                     <div class="flex items-center gap-2">
                         <button wire:click="closeVerification"
                             class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-sm rounded-xl transition">
                             Tutup
                         </button>
-                        <button wire:click="approveMobilePayment({{ $selectedMobileOrder->id }})"
-                            wire:confirm="Setujui pembayaran pesanan ini? Pesanan akan diubah menjadi COMPLETED, status nomor seri menjadi Sold, dan transaksi otomatis disinkronkan ke Accurate Online."
-                            class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Setujui & Terbitkan ke Accurate
-                        </button>
+                        @if ($isFulfillmentStage)
+                            <button wire:click="fulfillMobileOrder({{ $selectedMobileOrder->id }})"
+                                wire:confirm="Konfirmasi alokasi gudang & IMEI ini? Faktur Penjualan (SI) terhubung SO & Penerimaan (SR) akan diterbitkan ke Accurate Online."
+                                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Selesaikan &amp; Terbitkan Faktur (SI)
+                            </button>
+                        @else
+                            <button wire:click="approveMobilePayment({{ $selectedMobileOrder->id }})"
+                                wire:confirm="Setujui pembayaran lunas ini? Status akan menjadi Diproses dan Sales Order (SO) akan dibuat di Accurate Online tanpa mengunci IMEI."
+                                class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Verifikasi Lunas &amp; Buat SO Accurate
+                            </button>
+                        @endif
                     </div>
                 </div>
             </div>

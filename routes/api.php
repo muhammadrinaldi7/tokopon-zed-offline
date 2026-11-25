@@ -183,9 +183,11 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
             ->name('api.mobile.user.push-token');
     });
 
-    // 1. Daftar Unit Bisnis / Toko Online (Store Switcher)
+    // 1. Daftar Unit Bisnis / Toko Online (Store Switcher) & Daftar Cabang Pick Up
     Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
         ->name('api.mobile.business-units.index');
+    Route::get('/warehouses', [\App\Http\Controllers\Api\Mobile\WarehouseController::class, 'index'])
+        ->name('api.mobile.warehouses.index');
 
     // 1.1 Promo Banners & Flash Sales
     Route::get('/banners', [\App\Http\Controllers\Api\Mobile\BannerController::class, 'index'])
@@ -204,6 +206,8 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         ->name('api.mobile.products.show');
     Route::get('/products/{id}/serial-numbers', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
         ->name('api.mobile.products.serial-numbers');
+    Route::get('/products/{id}/units', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
+        ->name('api.mobile.products.units');
 
     // 3. Rekening Pembayaran Manual
     Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])

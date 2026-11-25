@@ -86,11 +86,23 @@ class EcommerceSettingsController extends Controller
 
             // 2. Data Gudang & Master Cabang BU
             $hasOnlineStoreCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'is_online_store');
+            $hasMultiWhCols = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'allow_online_delivery');
             $hasBuCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'business_unit_id');
 
             $whCols = ['id', 'name'];
             if ($hasOnlineStoreCol) {
                 $whCols[] = 'is_online_store';
+            }
+            if ($hasMultiWhCols) {
+                $whCols = array_merge($whCols, [
+                    'allow_online_delivery',
+                    'allow_store_pickup',
+                    'fulfillment_priority',
+                    'city',
+                    'address',
+                    'phone',
+                    'operating_hours',
+                ]);
             }
 
             $warehouses = collect();
@@ -103,12 +115,24 @@ class EcommerceSettingsController extends Controller
                             $q->where('business_unit_id', $selectedBuId)->orWhereNull('business_unit_id');
                         });
                     }
+                    if ($hasMultiWhCols) {
+                        $whQuery->orderBy('fulfillment_priority')->orderBy('name');
+                    } else {
+                        $whQuery->orderBy('name');
+                    }
                     $whRecords = $whQuery->limit(100)->get($whCols);
-                    $warehouses = $whRecords->map(function ($wh) use ($hasOnlineStoreCol, $cleanUtf8) {
+                    $warehouses = $whRecords->map(function ($wh) use ($hasOnlineStoreCol, $hasMultiWhCols, $cleanUtf8) {
                         return [
                             'id' => (int) $wh->id,
                             'name' => $cleanUtf8($wh->name ?? ('Gudang #' . $wh->id)),
                             'is_online_store' => $hasOnlineStoreCol ? (bool) ($wh->is_online_store ?? false) : false,
+                            'allow_online_delivery' => $hasMultiWhCols ? (bool) ($wh->allow_online_delivery ?? false) : ($hasOnlineStoreCol ? (bool) ($wh->is_online_store ?? false) : false),
+                            'allow_store_pickup' => $hasMultiWhCols ? (bool) ($wh->allow_store_pickup ?? false) : false,
+                            'fulfillment_priority' => $hasMultiWhCols ? (int) ($wh->fulfillment_priority ?? 100) : 100,
+                            'city' => $hasMultiWhCols ? $cleanUtf8($wh->city ?? '') : '',
+                            'address' => $hasMultiWhCols ? $cleanUtf8($wh->address ?? '') : '',
+                            'phone' => $hasMultiWhCols ? $cleanUtf8($wh->phone ?? '') : '',
+                            'operating_hours' => $hasMultiWhCols ? $cleanUtf8($wh->operating_hours ?? '') : '',
                         ];
                     });
 
@@ -342,6 +366,15 @@ class EcommerceSettingsController extends Controller
         $validated = $request->validate([
             'business_unit_id' => 'required|exists:business_units,id',
             'online_warehouse_id' => 'nullable|exists:warehouses,id',
+            'online_warehouses' => 'nullable|array',
+            'online_warehouses.*.id' => 'required_with:online_warehouses|integer|exists:warehouses,id',
+            'online_warehouses.*.allow_online_delivery' => 'boolean',
+            'online_warehouses.*.allow_store_pickup' => 'boolean',
+            'online_warehouses.*.fulfillment_priority' => 'nullable|integer|min:1|max:999',
+            'online_warehouses.*.city' => 'nullable|string|max:100',
+            'online_warehouses.*.address' => 'nullable|string|max:500',
+            'online_warehouses.*.phone' => 'nullable|string|max:30',
+            'online_warehouses.*.operating_hours' => 'nullable|string|max:100',
             'default_branch_name' => 'nullable|string|max:100',
             'default_sales_id' => 'nullable|exists:employes,id',
             'default_handled_by_id' => 'nullable|exists:users,id',
@@ -351,10 +384,38 @@ class EcommerceSettingsController extends Controller
 
         $buId = $validated['business_unit_id'];
 
-        // Atur gudang online store
-        if (Schema::hasColumn('warehouses', 'is_online_store') && !empty($validated['online_warehouse_id'])) {
-            Warehouse::where('business_unit_id', $buId)->update(['is_online_store' => false]);
-            Warehouse::where('id', $validated['online_warehouse_id'])->update(['is_online_store' => true]);
+        // Atur multi-warehouse online store (Delivery & Pick Up)
+        if (!empty($validated['online_warehouses']) && Schema::hasColumn('warehouses', 'allow_online_delivery')) {
+            foreach ($validated['online_warehouses'] as $whCfg) {
+                $allowDelivery = !empty($whCfg['allow_online_delivery']);
+                $allowPickup = !empty($whCfg['allow_store_pickup']);
+                Warehouse::where('id', (int) $whCfg['id'])
+                    ->where(function ($q) use ($buId) {
+                        $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                    })
+                    ->update([
+                        'is_online_store' => $allowDelivery || $allowPickup,
+                        'allow_online_delivery' => $allowDelivery,
+                        'allow_store_pickup' => $allowPickup,
+                        'fulfillment_priority' => max(1, (int) ($whCfg['fulfillment_priority'] ?? 100)),
+                        'city' => isset($whCfg['city']) ? (trim((string) $whCfg['city']) ?: null) : null,
+                        'address' => isset($whCfg['address']) ? (trim((string) $whCfg['address']) ?: null) : null,
+                        'phone' => isset($whCfg['phone']) ? (trim((string) $whCfg['phone']) ?: null) : null,
+                        'operating_hours' => isset($whCfg['operating_hours']) ? (trim((string) $whCfg['operating_hours']) ?: null) : null,
+                    ]);
+            }
+        } elseif (Schema::hasColumn('warehouses', 'is_online_store') && !empty($validated['online_warehouse_id'])) {
+            // Backward compatibility untuk payload legacy single warehouse
+            Warehouse::where('business_unit_id', $buId)->update([
+                'is_online_store' => false,
+                'allow_online_delivery' => false,
+                'allow_store_pickup' => false,
+            ]);
+            Warehouse::where('id', $validated['online_warehouse_id'])->update([
+                'is_online_store' => true,
+                'allow_online_delivery' => true,
+                'allow_store_pickup' => true,
+            ]);
         }
 
         $settingService->set("ecommerce_branch_{$buId}", $validated['default_branch_name'] ?? 'Banjarbaru');

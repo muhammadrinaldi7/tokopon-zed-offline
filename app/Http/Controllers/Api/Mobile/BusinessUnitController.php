@@ -15,11 +15,25 @@ class BusinessUnitController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // Hanya ambil BU yang aktif, diizinkan untuk mobile, dan memiliki setidaknya 1 gudang online
-        $onlineBuIdsWithWarehouse = Warehouse::where('is_online_store', true)
+        // Hanya ambil BU yang aktif, diizinkan untuk mobile, dan memiliki setidaknya 1 gudang online (Delivery / Pick Up)
+        $onlineBuIdsWithWarehouse = Warehouse::onlineStore()
             ->whereNotNull('business_unit_id')
             ->pluck('business_unit_id')
             ->unique()
+            ->toArray();
+
+        $pickupCountByBu = Warehouse::storePickup()
+            ->whereNotNull('business_unit_id')
+            ->selectRaw('business_unit_id, count(*) as total')
+            ->groupBy('business_unit_id')
+            ->pluck('total', 'business_unit_id')
+            ->toArray();
+
+        $deliveryCountByBu = Warehouse::onlineDelivery()
+            ->whereNotNull('business_unit_id')
+            ->selectRaw('business_unit_id, count(*) as total')
+            ->groupBy('business_unit_id')
+            ->pluck('total', 'business_unit_id')
             ->toArray();
 
         $query = BusinessUnit::query()
@@ -33,7 +47,7 @@ class BusinessUnitController extends Controller
 
         $businessUnits = $query->orderBy('id')->get();
 
-        $data = $businessUnits->map(function ($bu) {
+        $data = $businessUnits->map(function ($bu) use ($pickupCountByBu, $deliveryCountByBu) {
             $isSecond = ($bu->mobile_category === 'SECOND') || str_contains(strtoupper($bu->name), 'SECOND');
 
             return [
@@ -47,6 +61,10 @@ class BusinessUnitController extends Controller
                 'brand_color' => $bu->brand_color,
                 'warranty_highlight' => $bu->warranty_highlight,
                 'is_second' => $isSecond,
+                'supports_pickup' => (int) ($pickupCountByBu[$bu->id] ?? 0) > 0,
+                'supports_delivery' => (int) ($deliveryCountByBu[$bu->id] ?? 0) > 0,
+                'pickup_warehouse_count' => (int) ($pickupCountByBu[$bu->id] ?? 0),
+                'delivery_warehouse_count' => (int) ($deliveryCountByBu[$bu->id] ?? 0),
             ];
         });
 

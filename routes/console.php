@@ -74,6 +74,11 @@ Artisan::command('mail:test-mailtrap {email=test@example.com}', function (string
     ->everyTenMinutes()
     ->withoutOverlapping();
 
+// Rekonsiliasi periodik stok gudang online aktif dari Accurate (jaring pengaman jika ada webhook terlewat)
+\Illuminate\Support\Facades\Schedule::command('accurate:sync-online-stocks')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping();
+
 // Otomatis lepaskan komisi referral yang melewati batas hold_until H+7 dan pesanan selesai
 \Illuminate\Support\Facades\Schedule::command('referral:release-holds')
     ->dailyAt('01:00')

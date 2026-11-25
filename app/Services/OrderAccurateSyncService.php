@@ -129,7 +129,10 @@ class OrderAccurateSyncService
 
             $rawBranchName = $order->branch->name ?? 'Banjarbaru';
             $accurateBranchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
-            $accurateWarehouseName = $order->handledBy?->warehouse?->name ?? ($order->warehouse?->name ?? 'Head Office');
+            // Untuk pesanan MOBILE_APP, prioritaskan gudang pemenuhan (order->warehouse) yang dipilih admin saat fulfillment
+            $accurateWarehouseName = $order->order_channel === 'MOBILE_APP'
+                ? ($order->warehouse?->name ?? ($order->handledBy?->warehouse?->name ?? 'Head Office'))
+                : ($order->handledBy?->warehouse?->name ?? ($order->warehouse?->name ?? 'Head Office'));
 
             // 2. PROSES SALES INVOICE (FAKTUR PENJUALAN)
             if (empty($order->accurate_invoice_no)) {

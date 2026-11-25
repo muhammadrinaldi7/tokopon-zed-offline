@@ -32,7 +32,7 @@ class OrderController extends Controller
         $user = $request->user();
         $phone = $request->input('phone') ?? $request->header('X-Customer-Phone');
 
-        $query = Order::with(['items.productAccurate', 'payments.paymentMethod', 'warehouse'])
+        $query = Order::with(['items.productAccurate', 'payments.paymentMethod', 'warehouse', 'pickupWarehouse', 'shipping'])
             ->orderBy('id', 'desc');
 
         if ($user) {
@@ -78,15 +78,21 @@ class OrderController extends Controller
                 'instructions' => [],
             ] : null;
 
-            $items = $order->items->map(function ($item) {
+            $items = $order->items->map(function ($item) use ($order) {
+                $rawSns = !empty($item->serial_number) ? array_values(array_filter(array_map('trim', explode(',', $item->serial_number)))) : [];
+                // Tampilkan IMEI utuh hanya jika order sudah COMPLETED/terkirim; selain itu samarkan 4 digit terakhir
+                $displaySns = $order->order_status === 'COMPLETED'
+                    ? $rawSns
+                    : array_map(fn($sn) => strlen($sn) > 4 ? '****' . substr($sn, -4) : '****' . $sn, $rawSns);
+
                 return [
                     'id' => $item->id,
                     'product_id' => $item->product_accurate_id,
                     'product_name' => $item->product_name,
-                    'product_thumbnail' => $item->productAccurate?->getFirstMediaUrl('products') ?: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=400&q=80',
+                    'product_thumbnail' => $item->productAccurate?->getFirstMediaUrl('cover') ?: ($item->productAccurate?->getFirstMediaUrl('products') ?: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=400&q=80'),
                     'price' => (float) $item->price_at_checkout,
                     'quantity' => (int) $item->qty,
-                    'serial_numbers' => !empty($item->serial_number) ? explode(', ', $item->serial_number) : [],
+                    'serial_numbers' => $displaySns,
                     'subtotal' => (float) $item->subtotal,
                 ];
             });
@@ -95,6 +101,9 @@ class OrderController extends Controller
                 'id' => $order->id,
                 'order_number' => $order->order_number,
                 'status' => $order->order_status,
+                'fulfillment_type' => $order->fulfillment_type ?? 'DELIVERY',
+                'fulfillment_status' => $order->fulfillment_status,
+                'accurate_so_number' => $order->accurate_so_number,
                 'customer_name' => $order->shipping_address_snapshot['name'] ?? $order->user?->name ?? 'Pelanggan',
                 'customer_phone' => $order->shipping_address_snapshot['phone'] ?? '',
                 'customer_email' => $order->shipping_address_snapshot['email'] ?? $order->user?->email,
@@ -103,6 +112,19 @@ class OrderController extends Controller
                     'id' => $order->warehouse->id,
                     'name' => $order->warehouse->name,
                     'is_online_store' => (bool) $order->warehouse->is_online_store,
+                ] : null,
+                'pickup_warehouse' => $order->pickupWarehouse ? [
+                    'id' => $order->pickupWarehouse->id,
+                    'name' => $order->pickupWarehouse->name,
+                    'city' => $order->pickupWarehouse->city,
+                    'address' => $order->pickupWarehouse->address,
+                    'operating_hours' => $order->pickupWarehouse->operating_hours,
+                ] : null,
+                'shipping' => $order->shipping ? [
+                    'courier_company' => $order->shipping->courier_company,
+                    'courier_type' => $order->shipping->courier_type,
+                    'tracking_number' => $order->shipping->tracking_number,
+                    'status' => $order->shipping->status,
                 ] : null,
                 'branch_name' => $order->branch?->name ?? 'Banjarbaru',
                 'payment_method' => $paymentMethod,
@@ -137,7 +159,7 @@ class OrderController extends Controller
      */
     public function checkout(Request $request): JsonResponse
     {
-        // 0. Normalisasi fleksibel items (dukung product_id dan quantity dari mobile app)
+        // 0. Normalisasi fleksibel items (dukung product_id, quantity, dan opsional unit_id untuk GSK Second)
         $rawItems = $request->input('items', []);
         if (is_array($rawItems)) {
             $normalizedItems = [];
@@ -145,9 +167,11 @@ class OrderController extends Controller
                 $pId = $item['product_accurate_id'] ?? $item['product_id'] ?? null;
                 $qty = $item['qty'] ?? $item['quantity'] ?? 1;
                 $sns = $item['serial_numbers'] ?? [];
+                $unitId = $item['unit_id'] ?? $item['product_serial_number_id'] ?? null;
                 $normalizedItems[] = [
                     'product_accurate_id' => $pId ? (int) $pId : null,
                     'qty' => (int) $qty,
+                    'unit_id' => $unitId ? (int) $unitId : null,
                     'serial_numbers' => is_array($sns) ? $sns : [],
                 ];
             }
@@ -173,7 +197,10 @@ class OrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_accurate_id' => 'required|integer|exists:product_accurates,id',
             'items.*.qty' => 'required|integer|min:1',
+            'items.*.unit_id' => 'nullable|integer|exists:product_serial_numbers,id',
             'items.*.serial_numbers' => 'nullable|array',
+            'fulfillment_type' => 'nullable|string|in:DELIVERY,PICK_UP,delivery,pickup',
+            'pickup_warehouse_id' => 'nullable|integer|exists:warehouses,id',
             'payment_method_id' => 'nullable|integer|exists:payment_methods,id',
             'warehouse_id' => 'nullable|integer|exists:warehouses,id',
             'business_unit_id' => 'nullable|integer|exists:business_units,id',
@@ -251,9 +278,16 @@ class OrderController extends Controller
             }
 
             // 2. Siapkan payload checkout untuk MobileOrderService
+            $rawFulfillment = strtoupper((string) ($validated['fulfillment_type'] ?? 'DELIVERY'));
+            if ($rawFulfillment === 'PICKUP') {
+                $rawFulfillment = 'PICK_UP';
+            }
+
             $checkoutPayload = [
                 'user_id' => $user->id,
                 'items' => $validated['items'],
+                'fulfillment_type' => $rawFulfillment,
+                'pickup_warehouse_id' => $validated['pickup_warehouse_id'] ?? ($rawFulfillment === 'PICK_UP' ? ($validated['warehouse_id'] ?? null) : null),
                 'warehouse_id' => $validated['warehouse_id'] ?? null,
                 'business_unit_id' => $validated['business_unit_id'] ?? null,
                 'payment_method_id' => $validated['payment_method_id'] ?? null,
@@ -290,6 +324,15 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'order_status' => $order->order_status,
+                    'fulfillment_type' => $order->fulfillment_type ?? 'DELIVERY',
+                    'fulfillment_status' => $order->fulfillment_status,
+                    'pickup_warehouse' => $order->pickupWarehouse ? [
+                        'id' => $order->pickupWarehouse->id,
+                        'name' => $order->pickupWarehouse->name,
+                        'city' => $order->pickupWarehouse->city,
+                        'address' => $order->pickupWarehouse->address,
+                        'operating_hours' => $order->pickupWarehouse->operating_hours,
+                    ] : null,
                     'grand_total' => (float) $order->grand_total,
                     'formatted_grand_total' => 'Rp ' . number_format($order->grand_total, 0, ',', '.'),
                     'coupon_code' => $order->coupon_code,
@@ -316,7 +359,7 @@ class OrderController extends Controller
     public function show(string $orderNumber): JsonResponse
     {
         $order = Order::where('order_number', $orderNumber)
-            ->with(['items.variant', 'payments.paymentMethod', 'payments.media', 'warehouse'])
+            ->with(['items.variant', 'payments.paymentMethod', 'payments.media', 'warehouse', 'pickupWarehouse', 'shipping'])
             ->first();
 
         if (!$order) {
@@ -344,7 +387,12 @@ class OrderController extends Controller
             ];
         }
 
-        $items = $order->items->map(function ($item) {
+        $items = $order->items->map(function ($item) use ($order) {
+            $rawSns = !empty($item->serial_number) ? array_values(array_filter(array_map('trim', explode(',', $item->serial_number)))) : [];
+            $displaySns = $order->order_status === 'COMPLETED'
+                ? $rawSns
+                : array_map(fn($sn) => strlen($sn) > 4 ? '****' . substr($sn, -4) : '****' . $sn, $rawSns);
+
             return [
                 'id' => $item->id,
                 'product_name' => $item->product_name,
@@ -353,7 +401,7 @@ class OrderController extends Controller
                 'formatted_price' => 'Rp ' . number_format($item->price_at_checkout, 0, ',', '.'),
                 'subtotal' => (float) $item->subtotal,
                 'formatted_subtotal' => 'Rp ' . number_format($item->subtotal, 0, ',', '.'),
-                'serial_numbers' => !empty($item->serial_number) ? explode(', ', $item->serial_number) : [],
+                'serial_numbers' => $displaySns,
             ];
         });
 
@@ -368,6 +416,9 @@ class OrderController extends Controller
                 'id' => $order->id,
                 'order_number' => $order->order_number,
                 'order_status' => $order->order_status,
+                'fulfillment_type' => $order->fulfillment_type ?? 'DELIVERY',
+                'fulfillment_status' => $order->fulfillment_status,
+                'accurate_so_number' => $order->accurate_so_number,
                 'order_date' => $order->order_date?->format('Y-m-d'),
                 'total_amount' => (float) $order->total_amount,
                 'discount_amount' => (float) $order->discount_amount,
@@ -385,6 +436,20 @@ class OrderController extends Controller
                     'id' => $order->warehouse->id,
                     'name' => $order->warehouse->name,
                     'is_online_store' => (bool) $order->warehouse->is_online_store,
+                ] : null,
+                'pickup_warehouse' => $order->pickupWarehouse ? [
+                    'id' => $order->pickupWarehouse->id,
+                    'name' => $order->pickupWarehouse->name,
+                    'city' => $order->pickupWarehouse->city,
+                    'address' => $order->pickupWarehouse->address,
+                    'phone' => $order->pickupWarehouse->phone,
+                    'operating_hours' => $order->pickupWarehouse->operating_hours,
+                ] : null,
+                'shipping' => $order->shipping ? [
+                    'courier_company' => $order->shipping->courier_company,
+                    'courier_type' => $order->shipping->courier_type,
+                    'tracking_number' => $order->shipping->tracking_number,
+                    'status' => $order->shipping->status,
                 ] : null,
                 'branch_name' => $order->branch?->name ?? 'Banjarbaru',
                 'notes' => $order->notes,

@@ -24,6 +24,7 @@ class EcommerceSettings extends Component
     // Business Unit Scoped Settings
     public ?int $selectedBusinessUnitId = null;
     public ?int $selectedWarehouseId = null;
+    public array $warehouseConfigs = []; // [wh_id => ['allow_online_delivery' => bool, 'allow_store_pickup' => bool, 'fulfillment_priority' => int, 'city' => string, 'address' => string, 'phone' => string, 'operating_hours' => string]]
     public string $defaultBranchName = 'Banjarbaru';
     public ?int $defaultSalesId = null;
     public ?int $defaultHandledById = null;
@@ -80,10 +81,23 @@ class EcommerceSettings extends Component
             return;
         }
 
-        // 1. Gudang Online Store milik BU ini
-        $this->selectedWarehouseId = Warehouse::where('business_unit_id', $buId)
-            ->where('is_online_store', true)
-            ->value('id');
+        // 1. Gudang Online Store milik BU ini (Multi-Warehouse)
+        $buWhModels = Warehouse::where('business_unit_id', $buId)->orderBy('fulfillment_priority')->orderBy('name')->get();
+        $this->selectedWarehouseId = $buWhModels->firstWhere('is_online_store', true)?->id;
+        $this->warehouseConfigs = [];
+        foreach ($buWhModels as $wh) {
+            $this->warehouseConfigs[$wh->id] = [
+                'id' => $wh->id,
+                'name' => $wh->name,
+                'allow_online_delivery' => (bool) ($wh->allow_online_delivery || ($wh->is_online_store && !$wh->allow_store_pickup)),
+                'allow_store_pickup' => (bool) $wh->allow_store_pickup,
+                'fulfillment_priority' => (int) ($wh->fulfillment_priority ?? 100),
+                'city' => (string) ($wh->city ?? ''),
+                'address' => (string) ($wh->address ?? ''),
+                'phone' => (string) ($wh->phone ?? ''),
+                'operating_hours' => (string) ($wh->operating_hours ?? ''),
+            ];
+        }
 
         // 2. Cabang Default Accurate BU ini
         $this->defaultBranchName = (string) $settingService->get(
@@ -245,20 +259,32 @@ class EcommerceSettings extends Component
             return;
         }
 
-        // Reset flag is_online_store HANYA untuk gudang milik Unit Usaha terpilih
-        Warehouse::where('business_unit_id', $this->selectedBusinessUnitId)->update(['is_online_store' => false]);
+        $activeCount = 0;
+        foreach ($this->warehouseConfigs as $whId => $cfg) {
+            $allowDelivery = !empty($cfg['allow_online_delivery']);
+            $allowPickup = !empty($cfg['allow_store_pickup']);
+            $isOnline = $allowDelivery || $allowPickup;
+            if ($isOnline) {
+                $activeCount++;
+            }
 
-        if ($this->selectedWarehouseId) {
-            Warehouse::where('id', $this->selectedWarehouseId)
+            Warehouse::where('id', (int) $whId)
                 ->where('business_unit_id', $this->selectedBusinessUnitId)
-                ->update(['is_online_store' => true]);
-
-            $whName = Warehouse::find($this->selectedWarehouseId)?->name;
-            $buName = BusinessUnit::find($this->selectedBusinessUnitId)?->name;
-            $this->dispatch('toast', title: 'Berhasil', message: "Gudang '{$whName}' telah ditetapkan sebagai Gudang Online untuk {$buName}.", type: 'success');
-        } else {
-            $this->dispatch('toast', title: 'Berhasil', message: 'Gudang online dinonaktifkan untuk unit usaha ini.', type: 'info');
+                ->update([
+                    'is_online_store' => $isOnline,
+                    'allow_online_delivery' => $allowDelivery,
+                    'allow_store_pickup' => $allowPickup,
+                    'fulfillment_priority' => max(1, (int) ($cfg['fulfillment_priority'] ?? 100)),
+                    'city' => trim((string) ($cfg['city'] ?? '')) ?: null,
+                    'address' => trim((string) ($cfg['address'] ?? '')) ?: null,
+                    'phone' => trim((string) ($cfg['phone'] ?? '')) ?: null,
+                    'operating_hours' => trim((string) ($cfg['operating_hours'] ?? '')) ?: null,
+                ]);
         }
+
+        $buName = BusinessUnit::find($this->selectedBusinessUnitId)?->name ?? 'Unit Usaha';
+        $this->loadBusinessUnitSettings();
+        $this->dispatch('toast', title: 'Berhasil', message: "Konfigurasi Multi-Warehouse untuk {$buName} tersimpan ({$activeCount} gudang aktif online).", type: 'success');
     }
 
     public function saveDefaultBranch(SettingService $settingService): void

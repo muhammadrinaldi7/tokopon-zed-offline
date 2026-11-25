@@ -26,13 +26,15 @@ class OrderManagement extends Component
     public $showReceiptModal = false;
     public $completedOrder = null;
 
-    // Properties for Mobile Payment Verification Modal
+    // Properties for Mobile Payment Verification & Fulfillment Modal (2-Stage SO-First)
     public $showVerificationModal = false;
     public $selectedMobileOrder = null;
     public $verificationWarehouseId = null;
     public $verificationBranchName = null;
     public $verificationSalesId = null;
     public $verificationItemSns = []; // [order_item_id => serial_number]
+    public $fulfillmentCourierCompany = '';
+    public $fulfillmentTrackingNumber = '';
 
     // Properties for Issue Modal
     public $showIssueModal = false;
@@ -83,12 +85,14 @@ class OrderManagement extends Component
             'items.variant',
             'user.profile',
             'warehouse',
+            'pickupWarehouse',
+            'shipping',
             'salesBy',
             'branch'
         ])->find($orderId);
 
         if ($this->selectedMobileOrder) {
-            $this->verificationWarehouseId = $this->selectedMobileOrder->warehouse_id;
+            $this->verificationWarehouseId = $this->selectedMobileOrder->pickup_warehouse_id ?: $this->selectedMobileOrder->warehouse_id;
 
             $settingService = app(\App\Services\SettingService::class);
             $buId = $this->selectedMobileOrder->business_unit_id;
@@ -107,6 +111,9 @@ class OrderManagement extends Component
                 $this->verificationItemSns[$item->id] = $item->serial_number ?? '';
             }
 
+            $this->fulfillmentCourierCompany = (string) ($this->selectedMobileOrder->shipping?->courier_company ?? '');
+            $this->fulfillmentTrackingNumber = (string) ($this->selectedMobileOrder->shipping?->tracking_number ?? '');
+
             $this->showVerificationModal = true;
         }
     }
@@ -119,6 +126,8 @@ class OrderManagement extends Component
         $this->verificationBranchName = null;
         $this->verificationSalesId = null;
         $this->verificationItemSns = [];
+        $this->fulfillmentCourierCompany = '';
+        $this->fulfillmentTrackingNumber = '';
     }
 
     public function setItemSn(int $itemId, string $sn): void
@@ -167,14 +176,38 @@ class OrderManagement extends Component
                 'warehouse_id' => $this->verificationWarehouseId ? (int) $this->verificationWarehouseId : null,
                 'branch_name' => $this->verificationBranchName ? trim($this->verificationBranchName) : null,
                 'sales_id' => $this->verificationSalesId ? (int) $this->verificationSalesId : null,
-                'item_sns' => $this->verificationItemSns,
             ];
 
             app(\App\Services\MobileOrderService::class)->approvePayment($order, Auth::user(), $overrides);
             $this->closeVerification();
-            $this->dispatch('toast', title: 'Berhasil', message: "Pembayaran pesanan #{$order->order_number} disetujui & sinkronisasi Accurate diproses.", type: 'success');
+            $this->dispatch('toast', title: 'Pembayaran Disetujui', message: "Order #{$order->order_number} lunas! Sales Order (SO) Accurate diproses tanpa IMEI. Lanjutkan di menu Alokasi/Kirim saat barang siap.", type: 'success');
         } catch (\Throwable $e) {
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function fulfillMobileOrder(int $orderId): void
+    {
+        $order = Order::find($orderId);
+        if (!$order) {
+            return;
+        }
+
+        try {
+            $fulfillmentData = [
+                'warehouse_id' => $this->verificationWarehouseId ? (int) $this->verificationWarehouseId : null,
+                'branch_name' => $this->verificationBranchName ? trim($this->verificationBranchName) : null,
+                'sales_id' => $this->verificationSalesId ? (int) $this->verificationSalesId : null,
+                'item_sns' => $this->verificationItemSns,
+                'courier_company' => trim((string) $this->fulfillmentCourierCompany),
+                'tracking_number' => trim((string) $this->fulfillmentTrackingNumber),
+            ];
+
+            app(\App\Services\MobileOrderService::class)->fulfillOrder($order, Auth::user(), $fulfillmentData);
+            $this->closeVerification();
+            $this->dispatch('toast', title: 'Fulfillment Selesai', message: "Unit & IMEI order #{$order->order_number} terkonfirmasi. Faktur (SI) & Kwitansi (SR) Accurate sedang diterbitkan.", type: 'success');
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', title: 'Gagal Fulfillment', message: $e->getMessage(), type: 'error');
         }
     }
 

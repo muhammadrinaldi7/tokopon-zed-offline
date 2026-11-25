@@ -64,9 +64,23 @@ export default function EcommerceSettingsIndex({
 
     // 2. Form Business Unit Settings
     const [activeBuId, setActiveBuId] = useState(selectedBuId || buList?.[0]?.id || null);
+    const mapWarehousesToForm = (list) =>
+        (Array.isArray(list) ? list : []).map((wh) => ({
+            id: wh.id,
+            name: wh.name,
+            allow_online_delivery: Boolean(wh.allow_online_delivery ?? wh.is_online_store),
+            allow_store_pickup: Boolean(wh.allow_store_pickup),
+            fulfillment_priority: Number(wh.fulfillment_priority ?? 100),
+            city: wh.city || '',
+            address: wh.address || '',
+            phone: wh.phone || '',
+            operating_hours: wh.operating_hours || '',
+        }));
+
     const [buForm, setBuForm] = useState({
         business_unit_id: activeBuId,
         online_warehouse_id: buSettings?.online_warehouse_id || '',
+        online_warehouses: mapWarehousesToForm(warehouseList),
         default_branch_name: buSettings?.default_branch_name || 'Banjarbaru',
         default_sales_id: buSettings?.default_sales_id || '',
         default_handled_by_id: buSettings?.default_handled_by_id || '',
@@ -128,13 +142,23 @@ export default function EcommerceSettingsIndex({
         setBuForm({
             business_unit_id: activeBuId,
             online_warehouse_id: buSettings?.online_warehouse_id || '',
+            online_warehouses: mapWarehousesToForm(warehouseList),
             default_branch_name: buSettings?.default_branch_name || 'Banjarbaru',
             default_sales_id: buSettings?.default_sales_id || '',
             default_handled_by_id: buSettings?.default_handled_by_id || '',
             active_categories: Array.isArray(buSettings?.active_categories) ? buSettings.active_categories : [],
             active_brands: Array.isArray(buSettings?.active_brands) ? buSettings.active_brands : [],
         });
-    }, [buSettings, activeBuId]);
+    }, [buSettings, warehouses, activeBuId]);
+
+    const handleUpdateWarehouseRow = (whId, field, value) => {
+        setBuForm((prev) => ({
+            ...prev,
+            online_warehouses: (prev.online_warehouses || []).map((row) =>
+                row.id === whId ? { ...row, [field]: value } : row
+            ),
+        }));
+    };
 
     // Switch BU Tab
     const handleSwitchBu = (buId) => {
@@ -406,28 +430,109 @@ export default function EcommerceSettingsIndex({
                         </div>
 
                         <form onSubmit={handleSaveBu} className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-                                {/* Gudang Online */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                                        Gudang Online Store *
-                                    </label>
-                                    <select
-                                        value={buForm.online_warehouse_id}
-                                        onChange={(e) => setBuForm({ ...buForm, online_warehouse_id: e.target.value })}
-                                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                    >
-                                        <option value="">Pilih Gudang Online</option>
-                                        {warehouseList?.map((wh) => (
-                                            <option key={wh.id} value={wh.id}>
-                                                {wh.name} {wh.is_online_store ? '(Online Aktif)' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <span className="text-[10.5px] text-slate-400 mt-1 block">
-                                        Stok gudang ini akan menjadi acuan jumlah barang di aplikasi mobile.
+                            {/* Multi-Warehouse Matrix (Delivery & Pick Up) */}
+                            <div className="space-y-2.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">
+                                            Multi-Warehouse Online (Delivery &amp; Store Pick Up)
+                                        </label>
+                                        <span className="text-[11px] text-slate-500">
+                                            Centang lebih dari 1 gudang untuk Pool Delivery dan/atau cabang Ambil di Toko (Pick Up). Biarkan kosong untuk gudang Retur/Rusak/Service.
+                                        </span>
+                                    </div>
+                                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-center">
+                                        {(buForm.online_warehouses || []).filter((w) => w.allow_online_delivery || w.allow_store_pickup).length} gudang aktif online
                                     </span>
                                 </div>
+
+                                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50/40">
+                                    <table className="min-w-full divide-y divide-slate-200/80 text-xs">
+                                        <thead className="bg-slate-100/80 text-[10.5px] font-black uppercase text-slate-500">
+                                            <tr>
+                                                <th className="px-3.5 py-2.5 text-left">Gudang / Cabang</th>
+                                                <th className="px-3 py-2.5 text-center">Delivery</th>
+                                                <th className="px-3 py-2.5 text-center">Pick Up</th>
+                                                <th className="px-3 py-2.5 text-center">Prioritas</th>
+                                                <th className="px-3 py-2.5 text-left">Kota</th>
+                                                <th className="px-3 py-2.5 text-left">Jam Buka &amp; Alamat Cabang</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                            {(buForm.online_warehouses || []).map((wh) => {
+                                                const isActive = wh.allow_online_delivery || wh.allow_store_pickup;
+                                                return (
+                                                    <tr key={wh.id} className={isActive ? 'bg-purple-50/30' : ''}>
+                                                        <td className="px-3.5 py-2.5 font-bold text-slate-800 whitespace-nowrap">
+                                                            {wh.name}
+                                                            {isActive && (
+                                                                <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9.5px] font-black">
+                                                                    AKTIF
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={Boolean(wh.allow_online_delivery)}
+                                                                onChange={(e) => handleUpdateWarehouseRow(wh.id, 'allow_online_delivery', e.target.checked)}
+                                                                className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={Boolean(wh.allow_store_pickup)}
+                                                                onChange={(e) => handleUpdateWarehouseRow(wh.id, 'allow_store_pickup', e.target.checked)}
+                                                                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max="999"
+                                                                value={wh.fulfillment_priority}
+                                                                onChange={(e) => handleUpdateWarehouseRow(wh.id, 'fulfillment_priority', Number(e.target.value || 100))}
+                                                                className="w-16 text-center px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <input
+                                                                type="text"
+                                                                value={wh.city}
+                                                                onChange={(e) => handleUpdateWarehouseRow(wh.id, 'city', e.target.value)}
+                                                                placeholder="Banjarbaru"
+                                                                className="w-28 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex flex-col sm:flex-row gap-1.5">
+                                                                <input
+                                                                    type="text"
+                                                                    value={wh.operating_hours}
+                                                                    onChange={(e) => handleUpdateWarehouseRow(wh.id, 'operating_hours', e.target.value)}
+                                                                    placeholder="09:00-21:00"
+                                                                    className="w-28 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={wh.address}
+                                                                    onChange={(e) => handleUpdateWarehouseRow(wh.id, 'address', e.target.value)}
+                                                                    placeholder="Alamat lengkap cabang..."
+                                                                    className="flex-1 min-w-[160px] px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
 
                                 {/* Cabang Accurate */}
                                 <div>

@@ -174,124 +174,80 @@
             {{-- Grid Setting Per Unit Usaha --}} 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                {{-- 1. Online Warehouse for this BU (Searchable) --}}
-                <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-amber-200 transition">
+                {{-- 1. Multi-Warehouse Online Store Matrix (Delivery & Pick Up) --}}
+                <div class="md:col-span-2 lg:col-span-3 bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-amber-200 transition">
                     <div>
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-xl font-bold">
-                                🏬
-                            </div>
-                            <div>
-                                <h4 class="text-sm font-black text-gray-900">Gudang Online Store</h4>
-                                <p class="text-[11px] text-gray-500">Sumber stok online {{ $currentBU?->name }}</p>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3 mt-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Gudang Online Unit Ini</label>
-                                
-                                {{-- Searchable Dropdown Gudang --}}
-                                <div wire:key="searchable-wh-{{ $selectedBusinessUnitId }}"
-                                    x-data="{
-                                        open: false,
-                                        search: '',
-                                        selectedId: @entangle('selectedWarehouseId').live,
-                                        selectedName: '',
-                                        options: {{ json_encode($warehouseOptions) }},
-                                        init() {
-                                            this.updateLabel();
-                                            this.$watch('selectedId', () => this.updateLabel());
-                                        },
-                                        updateLabel() {
-                                            if (!this.selectedId) {
-                                                this.selectedName = '-- Tidak Ada Gudang Online Aktif --';
-                                                return;
-                                            }
-                                            let found = this.options.find(o => String(o.id) === String(this.selectedId));
-                                            this.selectedName = found ? found.name : '-- Pilih Gudang Online --';
-                                        },
-                                        get filteredOptions() {
-                                            if (!this.search) return this.options;
-                                            let s = this.search.toLowerCase();
-                                            return this.options.filter(o => o.name.toLowerCase().includes(s));
-                                        },
-                                        selectOption(id) {
-                                            this.selectedId = id ? parseInt(id) : null;
-                                            this.updateLabel();
-                                            this.open = false;
-                                            this.search = '';
-                                        }
-                                    }" 
-                                    @click.outside="open = false" 
-                                    class="relative">
-                                    
-                                    <button @click="open = !open" type="button" 
-                                        class="w-full pl-3.5 pr-10 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 bg-white text-left cursor-pointer flex items-center justify-between shadow-2xs hover:border-amber-400 transition">
-                                        <span class="truncate" x-text="selectedName">-- Pilih Gudang Online --</span>
-                                        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </button>
-
-                                    <div x-show="open" 
-                                         x-transition:enter="transition ease-out duration-100"
-                                         x-transition:enter-start="transform opacity-0 scale-95"
-                                         x-transition:enter-end="transform opacity-100 scale-100"
-                                         x-transition:leave="transition ease-in duration-75"
-                                         x-transition:leave-start="transform opacity-100 scale-100"
-                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-hidden flex flex-col" 
-                                         style="display: none;">
-                                        
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/70 relative">
-                                            <input x-model="search" 
-                                                   x-ref="whSearchInput"
-                                                   type="text" 
-                                                   placeholder="Ketik cari nama gudang..." 
-                                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 bg-white"
-                                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.whSearchInput.focus(), 50) })">
-                                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                            </svg>
-                                        </div>
-
-                                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
-                                            <button @click="selectOption(null)" type="button" 
-                                                class="w-full text-left px-3.5 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-between font-medium">
-                                                <span>-- Tidak Ada Gudang Online Aktif --</span>
-                                                <span x-show="!selectedId" class="text-amber-600 font-bold">✓</span>
-                                            </button>
-
-                                            <template x-for="item in filteredOptions" :key="item.id">
-                                                <button @click="selectOption(item.id)" type="button" 
-                                                    class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-amber-50 transition-colors flex items-center justify-between" 
-                                                    :class="String(selectedId) === String(item.id) ? 'bg-amber-50/80 text-amber-700 font-bold' : 'text-gray-700'">
-                                                    <span x-text="item.name" class="truncate"></span>
-                                                    <span x-show="String(selectedId) === String(item.id)" class="text-amber-600 font-black">✓</span>
-                                                </button>
-                                            </template>
-
-                                            <div x-show="filteredOptions.length === 0" class="px-4 py-4 text-center text-xs text-gray-400">
-                                                Tidak ada gudang yang cocok.
-                                            </div>
-                                        </div>
-                                    </div>
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-xl font-bold shrink-0">
+                                    🏬
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-black text-gray-900">Pengaturan Multi-Warehouse Online ({{ $currentBU?->name }})</h4>
+                                    <p class="text-[11px] text-gray-500">Pilih lebih dari 1 gudang cabang untuk <strong>Pool Delivery</strong> dan/atau <strong>Ambil di Toko (Pick Up)</strong>. Biarkan non-aktif untuk gudang Retur/Rusak/Service.</p>
                                 </div>
                             </div>
-
-                            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200/60 text-xs text-amber-900">
-                                <span class="font-bold">Gudang Aktif Unit:</span> {{ $onlineWarehouse ? $onlineWarehouse->name : 'Belum Ditentukan' }}
-                            </div>
+                            <button type="button" wire:click="saveWarehouse"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer">
+                                <span wire:loading.remove wire:target="saveWarehouse">Simpan Multi-Warehouse</span>
+                                <span wire:loading wire:target="saveWarehouse">Menyimpan...</span>
+                            </button>
                         </div>
-                    </div>
 
-                    <div class="pt-4 mt-4 border-t border-gray-200/60">
-                        <button type="button" wire:click="saveWarehouse"
-                            class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 flex items-center justify-center gap-2 shadow-xs">
-                            <span wire:loading.remove wire:target="saveWarehouse">Simpan Gudang Online ({{ $currentBU?->name }})</span>
-                            <span wire:loading wire:target="saveWarehouse">Menyimpan...</span>
-                        </button>
+                        <div class="overflow-x-auto bg-white rounded-2xl border border-gray-200/80">
+                            <table class="min-w-full divide-y divide-gray-100 text-xs">
+                                <thead class="bg-gray-50/80 text-[11px] font-black uppercase text-gray-500">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Nama Gudang / Cabang</th>
+                                        <th class="px-3 py-3 text-center">Aktif Delivery</th>
+                                        <th class="px-3 py-3 text-center">Aktif Pick Up</th>
+                                        <th class="px-3 py-3 text-center w-24">Prioritas</th>
+                                        <th class="px-3 py-3 text-left">Kota</th>
+                                        <th class="px-3 py-3 text-left">Jam Operasional & Alamat Pick Up</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @forelse($warehouseConfigs as $whId => $cfg)
+                                        <tr wire:key="wh-row-{{ $whId }}" class="{{ ($cfg['allow_online_delivery'] || $cfg['allow_store_pickup']) ? 'bg-amber-50/30' : 'hover:bg-gray-50/60' }}">
+                                            <td class="px-4 py-3 font-bold text-gray-800 whitespace-nowrap">
+                                                {{ $cfg['name'] }}
+                                                @if($cfg['allow_online_delivery'] || $cfg['allow_store_pickup'])
+                                                    <span class="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-black">ONLINE</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-3 text-center">
+                                                <input type="checkbox" wire:model="warehouseConfigs.{{ $whId }}.allow_online_delivery"
+                                                    class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                            </td>
+                                            <td class="px-3 py-3 text-center">
+                                                <input type="checkbox" wire:model="warehouseConfigs.{{ $whId }}.allow_store_pickup"
+                                                    class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                            </td>
+                                            <td class="px-3 py-3 text-center">
+                                                <input type="number" min="1" max="999" wire:model="warehouseConfigs.{{ $whId }}.fulfillment_priority"
+                                                    class="w-16 text-center px-2 py-1 border border-gray-200 rounded-lg text-xs font-semibold">
+                                            </td>
+                                            <td class="px-3 py-3">
+                                                <input type="text" wire:model="warehouseConfigs.{{ $whId }}.city" placeholder="Banjarbaru"
+                                                    class="w-32 px-2.5 py-1 border border-gray-200 rounded-lg text-xs">
+                                            </td>
+                                            <td class="px-3 py-3">
+                                                <div class="flex flex-col sm:flex-row gap-1.5">
+                                                    <input type="text" wire:model="warehouseConfigs.{{ $whId }}.operating_hours" placeholder="09:00 - 21:00"
+                                                        class="w-32 px-2.5 py-1 border border-gray-200 rounded-lg text-xs">
+                                                    <input type="text" wire:model="warehouseConfigs.{{ $whId }}.address" placeholder="Alamat lengkap cabang..."
+                                                        class="flex-1 min-w-44 px-2.5 py-1 border border-gray-200 rounded-lg text-xs">
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="px-4 py-6 text-center text-gray-400">Belum ada data gudang untuk unit usaha ini.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 

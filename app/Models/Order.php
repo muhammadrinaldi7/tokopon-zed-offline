@@ -13,6 +13,7 @@ class Order extends Model
         'shipping_address_snapshot' => 'array',
         'order_date' => 'date',
         'payment_expired_at' => 'datetime',
+        'fulfilled_at' => 'datetime',
         'coupon_discount_amount' => 'decimal:2',
     ];
 
@@ -177,6 +178,21 @@ class Order extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function pickupWarehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'pickup_warehouse_id');
+    }
+
+    public function fulfilledBy()
+    {
+        return $this->belongsTo(User::class, 'fulfilled_by');
+    }
+
+    public function stockReservations()
+    {
+        return $this->hasMany(OnlineStockReservation::class);
     }
 
     public function paymentMethod()

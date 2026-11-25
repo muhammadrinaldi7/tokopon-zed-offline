@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessUnit;
 use App\Models\ProductAccurate;
-use App\Models\Warehouse;
-use App\Models\WarehouseStock;
+use App\Services\OnlineStockService;
+use App\Services\SecondUnitShowcaseService;
 use App\Services\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,12 +14,26 @@ use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
+    protected OnlineStockService $onlineStockService;
+    protected SecondUnitShowcaseService $secondUnitService;
+
+    public function __construct(
+        OnlineStockService $onlineStockService,
+        SecondUnitShowcaseService $secondUnitService
+    ) {
+        $this->onlineStockService = $onlineStockService;
+        $this->secondUnitService = $secondUnitService;
+    }
+
     /**
-     * Mengambil daftar produk yang stoknya tersedia di gudang online store (is_online_store = true).
+     * Mengambil daftar produk yang stoknya tersedia di gudang online (Multi-Warehouse Delivery / Pick Up).
+     * 100% membaca DB lokal + dikurangi reservasi online aktif (ATP) agar respon < 50ms & aman dari rate limit Accurate.
      */
     public function index(Request $request): JsonResponse
     {
-        $businessUnitId = $request->query('business_unit_id');
+        $businessUnitId = $request->query('business_unit_id') ? (int) $request->query('business_unit_id') : null;
+        $fulfillmentType = strtolower(trim((string) $request->query('fulfillment_type', 'any'))); // delivery | pickup | any
+        $warehouseId = $request->query('warehouse_id') ? (int) $request->query('warehouse_id') : null;
         $search = $request->query('search');
         $category = $request->query('category');
         $brand = $request->query('brand');
@@ -28,35 +42,50 @@ class ProductController extends Controller
         $sort = $request->query('sort', 'latest'); // latest, price_asc, price_desc, name_asc
         $perPage = min((int) ($request->query('per_page', 20)), 50);
 
-        // 1. Dapatkan daftar ID gudang yang diizinkan untuk toko online & unit bisnis terkait
-        $warehouseQuery = Warehouse::where('is_online_store', true);
-        if ($businessUnitId) {
-            $warehouseQuery->where('business_unit_id', $businessUnitId);
-        } else {
-            // Hanya izinkan gudang dari Business Unit yang aktif dan disetujui untuk mobile
-            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
-                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
-            });
-        }
-        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
+        // 1. Dapatkan daftar gudang online aktif (Multi-Warehouse) sesuai mode
+        $deliveryWarehouseIds = $this->onlineStockService
+            ->getOnlineWarehouses($businessUnitId, 'delivery')
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
 
-        if (empty($onlineWarehouseIds)) {
+        $pickupWarehouseIds = $this->onlineStockService
+            ->getOnlineWarehouses($businessUnitId, 'pickup')
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
+
+        if ($fulfillmentType === 'delivery') {
+            $filterWarehouseIds = $deliveryWarehouseIds;
+        } elseif ($fulfillmentType === 'pickup') {
+            $filterWarehouseIds = $warehouseId
+                ? (in_array($warehouseId, $pickupWarehouseIds, true) ? [$warehouseId] : [])
+                : $pickupWarehouseIds;
+        } else {
+            $allIds = array_values(array_unique(array_merge($deliveryWarehouseIds, $pickupWarehouseIds)));
+            $filterWarehouseIds = $warehouseId
+                ? (in_array($warehouseId, $allIds, true) ? [$warehouseId] : [])
+                : $allIds;
+        }
+
+        if (empty($filterWarehouseIds)) {
             return response()->json([
                 'success' => true,
-                'message' => 'Tidak ada produk atau gudang online store yang aktif untuk toko ini.',
+                'message' => 'Tidak ada produk atau gudang online store yang aktif untuk filter ini.',
                 'data' => [],
                 'meta' => [
                     'current_page' => 1,
                     'last_page' => 1,
+                    'per_page' => $perPage,
                     'total' => 0,
                 ]
             ]);
         }
 
-        // 2. Query produk yang memiliki stok agregat > 0 di gudang online
+        // 2. Query produk yang memiliki stok fisik > 0 di gudang online terpilih
         $query = ProductAccurate::query()
             ->where('base_price', '>', 0)
-            ->whereExists(function ($sub) use ($onlineWarehouseIds) {
+            ->whereExists(function ($sub) use ($filterWarehouseIds) {
                 $sub->select(DB::raw(1))
                     ->from('warehouse_stocks')
                     ->whereColumn('warehouse_stocks.variant_id', 'product_accurates.id')
@@ -65,7 +94,7 @@ class ProductController extends Controller
                         'App\\Models\\ProductAccurate',
                         'ProductAccurate'
                     ])
-                    ->whereIn('warehouse_stocks.warehouse_id', $onlineWarehouseIds)
+                    ->whereIn('warehouse_stocks.warehouse_id', $filterWarehouseIds)
                     ->where('warehouse_stocks.stock', '>', 0);
             })
             ->with([
@@ -74,9 +103,6 @@ class ProductController extends Controller
                 'product.media',
                 'productVariants.media',
                 'secondProductVariants.media',
-                'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
-                    $q->whereIn('warehouse_id', $onlineWarehouseIds);
-                }
             ]);
 
         // Filter per Business Unit (Toko)
@@ -89,7 +115,7 @@ class ProductController extends Controller
         }
 
         // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
-        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
+        $this->applyCurationFilters($query, $businessUnitId);
 
         // Filter Pencarian
         if (!empty($search)) {
@@ -127,11 +153,37 @@ class ProductController extends Controller
 
         $paginated = $query->paginate($perPage);
 
-        // Format data response untuk konsumsi frontend Mobile
-        $items = $paginated->getCollection()->map(function ($product) {
-            $totalOnlineStock = $product->warehouseStocks->sum('stock');
+        // 3. Hitung ATP (Stok Fisik - Reservasi Online Aktif) dalam 2 batch query (0 N+1)
+        $pageProductIds = $paginated->getCollection()->pluck('id')->map(fn($id) => (int) $id)->all();
+        $atpMap = $this->onlineStockService->getBatchAvailableStock(
+            $pageProductIds,
+            $deliveryWarehouseIds,
+            $pickupWarehouseIds
+        );
 
-            // Ambil gambar produk terbaik (Prioritas: Cover ProductAccurate -> Cover Induk -> Varian Baru -> Varian Second)
+        // Format data response untuk konsumsi frontend Mobile
+        $items = $paginated->getCollection()->map(function ($product) use ($atpMap, $fulfillmentType, $warehouseId) {
+            $metrics = $atpMap[$product->id] ?? [
+                'delivery_stock' => 0,
+                'pickup_stock_total' => 0,
+                'available_warehouse_count' => 0,
+                'per_warehouse' => [],
+            ];
+
+            $deliveryStock = (int) $metrics['delivery_stock'];
+            $pickupStockTotal = (int) $metrics['pickup_stock_total'];
+
+            if ($warehouseId) {
+                $effectiveStock = (int) ($metrics['per_warehouse'][$warehouseId] ?? 0);
+            } elseif ($fulfillmentType === 'delivery') {
+                $effectiveStock = $deliveryStock;
+            } elseif ($fulfillmentType === 'pickup') {
+                $effectiveStock = $pickupStockTotal;
+            } else {
+                $effectiveStock = max($deliveryStock, $pickupStockTotal);
+            }
+
+            // Ambil gambar produk terbaik
             $imageUrl = null;
             if ($product->hasMedia('cover')) {
                 $imageUrl = $product->getFirstMediaUrl('cover');
@@ -149,6 +201,8 @@ class ProductController extends Controller
                 }
             }
 
+            $isSecond = $this->secondUnitService->isSecondProduct($product);
+
             return [
                 'id' => $product->id,
                 'item_no' => $product->item_no,
@@ -158,8 +212,14 @@ class ProductController extends Controller
                 'proyek' => $product->proyek,
                 'price' => (float) $product->base_price,
                 'formatted_price' => 'Rp ' . number_format($product->base_price, 0, ',', '.'),
-                'stock' => (int) $totalOnlineStock,
+                'stock' => $effectiveStock,
+                'stock_delivery' => $deliveryStock,
+                'stock_pickup_total' => $pickupStockTotal,
+                'available_warehouse_count' => (int) $metrics['available_warehouse_count'],
+                'supports_pickup' => $pickupStockTotal > 0,
+                'supports_delivery' => $deliveryStock > 0,
                 'has_sn' => (bool) $product->has_sn,
+                'is_second_unit' => $isSecond,
                 'image_url' => $imageUrl,
                 'business_unit' => $product->businessUnit ? [
                     'id' => $product->businessUnit->id,
@@ -171,7 +231,7 @@ class ProductController extends Controller
                     'warranty_highlight' => $product->businessUnit->warranty_highlight,
                 ] : null,
             ];
-        });
+        })->values();
 
         return response()->json([
             'success' => true,
@@ -187,21 +247,17 @@ class ProductController extends Controller
     }
 
     /**
-     * Mengambil detail lengkap spesifikasi, foto, dan ketersediaan stok produk.
+     * Mengambil detail lengkap spesifikasi, foto, ketersediaan stok Multi-Warehouse (Live Accurate Cached 30s),
+     * serta preview unit QC (khusus GSK Second dari tabel `device_inspections`).
      */
     public function show(int $id): JsonResponse
     {
-        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
-
         $product = ProductAccurate::with([
             'businessUnit.media',
             'media',
             'product.media',
             'productVariants.media',
             'secondProductVariants.media',
-            'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
-                $q->whereIn('warehouse_id', $onlineWarehouseIds)->with('warehouse');
-            }
         ])->find($id);
 
         if (!$product) {
@@ -230,7 +286,8 @@ class ProductController extends Controller
             }
         }
 
-        $totalOnlineStock = $product->warehouseStocks->sum('stock');
+        // Hybrid Stock Check: Live Accurate dengan Cache TTL 30s + dikurangi reservasi online lokal
+        $stockBreakdown = $this->onlineStockService->getProductStockBreakdown($product, refreshLiveFromAccurate: true);
 
         // Kumpulkan semua foto produk
         $images = [];
@@ -265,14 +322,21 @@ class ProductController extends Controller
         }
         $images = array_values(array_unique(array_filter($images)));
 
-        // Rincian stok per gudang online
-        $stockBreakdown = $product->warehouseStocks->map(function ($ws) {
-            return [
-                'warehouse_id' => $ws->warehouse_id,
-                'warehouse_name' => $ws->warehouse?->name ?? 'Gudang Online',
-                'stock' => (int) $ws->stock,
-            ];
-        });
+        // Transparansi Unit GSK Second dari `device_inspections`
+        $isSecond = $this->secondUnitService->isSecondProduct($product);
+        $secondUnits = $isSecond ? $this->secondUnitService->getAvailableUnitsForProduct($product) : [];
+        $unitsWithQcCount = count(array_filter($secondUnits, fn($u) => !empty($u['has_qc_report'])));
+
+        // Rincian stok per gudang (backward-compatible)
+        $legacyStockBreakdown = collect($stockBreakdown['pickup_warehouses'])
+            ->merge($stockBreakdown['delivery_warehouses'])
+            ->unique('warehouse_id')
+            ->map(fn($w) => [
+                'warehouse_id' => $w['warehouse_id'],
+                'warehouse_name' => $w['warehouse_name'],
+                'stock' => (int) $w['stock'],
+            ])
+            ->values();
 
         return response()->json([
             'success' => true,
@@ -283,11 +347,20 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'category' => $product->categoryName,
                 'brand' => $product->brandName,
+                'proyek' => $product->proyek,
                 'price' => (float) $product->base_price,
                 'formatted_price' => 'Rp ' . number_format($product->base_price, 0, ',', '.'),
-                'stock' => (int) $totalOnlineStock,
+                'stock' => (int) $stockBreakdown['total_available_stock'],
+                'total_delivery_stock' => (int) $stockBreakdown['total_delivery_stock'],
+                'total_pickup_stock' => (int) $stockBreakdown['total_pickup_stock'],
+                'stock_source' => $stockBreakdown['stock_source'],
                 'has_sn' => (bool) $product->has_sn,
-                'is_in_stock' => $totalOnlineStock > 0,
+                'is_in_stock' => $stockBreakdown['total_available_stock'] > 0,
+                'is_second_unit' => $isSecond,
+                'requires_unit_selection' => false, // Pemesanan via SO berbasis Qty; pemilihan unit spesifik bersifat opsional untuk GSK Second
+                'supports_unit_selection' => $isSecond && count($secondUnits) > 0,
+                'units_with_qc_count' => $unitsWithQcCount,
+                'available_units_preview' => array_slice($secondUnits, 0, 6),
                 'images' => $images,
                 'description' => $product->product?->description ?? ($product->raw_data['detailNotes'] ?? null),
                 'business_unit' => $product->businessUnit ? [
@@ -299,27 +372,28 @@ class ProductController extends Controller
                     'brand_color' => $product->businessUnit->brand_color,
                     'warranty_highlight' => $product->businessUnit->warranty_highlight,
                 ] : null,
-                'stock_per_warehouse' => $stockBreakdown,
+                'pickup_warehouses' => $stockBreakdown['pickup_warehouses'],
+                'delivery_warehouses' => $stockBreakdown['delivery_warehouses'],
+                'stock_per_warehouse' => $legacyStockBreakdown,
             ]
         ]);
     }
 
     /**
-     * Mengambil daftar kategori produk yang tersedia di online store.
+     * Mengambil daftar kategori produk yang tersedia di online store (Multi-Warehouse).
      */
     public function categories(Request $request): JsonResponse
     {
-        $businessUnitId = $request->query('business_unit_id');
+        $businessUnitId = $request->query('business_unit_id') ? (int) $request->query('business_unit_id') : null;
+        $onlineWarehouseIds = $this->onlineStockService
+            ->getOnlineWarehouses($businessUnitId, 'any')
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
 
-        $warehouseQuery = Warehouse::where('is_online_store', true);
-        if ($businessUnitId) {
-            $warehouseQuery->where('business_unit_id', $businessUnitId);
-        } else {
-            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
-                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
-            });
+        if (empty($onlineWarehouseIds)) {
+            return response()->json(['success' => true, 'data' => []]);
         }
-        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
 
         $query = ProductAccurate::where('base_price', '>', 0)
             ->whereNotNull('categoryName')
@@ -340,8 +414,7 @@ class ProductController extends Controller
             });
         }
 
-        // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
-        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
+        $this->applyCurationFilters($query, $businessUnitId);
 
         $categories = $query->distinct()->pluck('categoryName')->filter()->values();
 
@@ -352,21 +425,20 @@ class ProductController extends Controller
     }
 
     /**
-     * Mengambil daftar merek produk yang tersedia di online store.
+     * Mengambil daftar merek produk yang tersedia di online store (Multi-Warehouse).
      */
     public function brands(Request $request): JsonResponse
     {
-        $businessUnitId = $request->query('business_unit_id');
+        $businessUnitId = $request->query('business_unit_id') ? (int) $request->query('business_unit_id') : null;
+        $onlineWarehouseIds = $this->onlineStockService
+            ->getOnlineWarehouses($businessUnitId, 'any')
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
 
-        $warehouseQuery = Warehouse::where('is_online_store', true);
-        if ($businessUnitId) {
-            $warehouseQuery->where('business_unit_id', $businessUnitId);
-        } else {
-            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
-                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
-            });
+        if (empty($onlineWarehouseIds)) {
+            return response()->json(['success' => true, 'data' => []]);
         }
-        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
 
         $query = ProductAccurate::where('base_price', '>', 0)
             ->whereNotNull('brandName')
@@ -387,8 +459,7 @@ class ProductController extends Controller
             });
         }
 
-        // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
-        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
+        $this->applyCurationFilters($query, $businessUnitId);
 
         $brands = $query->distinct()->pluck('brandName')->filter()->values();
 
@@ -399,13 +470,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Mengambil daftar nomor seri (IMEI / SN) yang tersedia untuk produk tertentu di gudang online.
-     * Khusus untuk produk yang memiliki SN (has_sn = true), seperti iPhone second, gadget bergaransi, dsb.
+     * Endpoint daftar unit fisik & transparansi kondisi QC (`device_inspections`) untuk GSK Second.
+     * - Untuk produk Baru (`Syihab`): tidak memerlukan pemilihan IMEI di awal (SO berbasis Qty).
+     * - Untuk produk GSK Second: mengembalikan daftar unit lengkap dengan Battery Health, QC verdict,
+     *   noted_issues, foto `qc_photos`, lokasi cabang, dan IMEI disamarkan (`****XXXX`).
      */
     public function serialNumbers(Request $request, int $id): JsonResponse
     {
-        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
-        $product = ProductAccurate::find($id);
+        $product = ProductAccurate::with('businessUnit')->find($id);
 
         if (!$product) {
             return response()->json([
@@ -414,47 +486,34 @@ class ProductController extends Controller
             ], 404);
         }
 
-        if (!$product->has_sn) {
+        $isSecond = $this->secondUnitService->isSecondProduct($product);
+
+        if (!$product->has_sn || !$isSecond) {
             return response()->json([
                 'success' => true,
-                'message' => 'Produk ini tidak menggunakan nomor seri / IMEI.',
+                'message' => $isSecond
+                    ? 'Produk ini tidak menggunakan pelacakan nomor seri / IMEI.'
+                    : 'Produk baru bersegel identik; IMEI akan ditentukan & dipindai otomatis oleh tim gudang saat pengiriman/pengambilan.',
+                'is_second_unit' => $isSecond,
+                'requires_unit_selection' => false,
+                'supports_unit_selection' => false,
                 'data' => [],
             ]);
         }
 
-        $warehouseId = $request->query('warehouse_id');
-        $query = \App\Models\ProductSerialNumber::with('warehouse')
-            ->where('product_accurate_id', $product->id)
-            ->where('status', 'Available');
-
-        if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
-        } else {
-            $query->whereIn('warehouse_id', $onlineWarehouseIds);
-        }
-
-        $serialNumbers = $query->get()->map(function ($sn) {
-            return [
-                'id' => $sn->id,
-                'serial_number' => $sn->serial_number,
-                'warehouse_id' => $sn->warehouse_id,
-                'warehouse_name' => $sn->warehouse?->name,
-                'qc_status' => $sn->qc_status,
-                'receipt_date' => $sn->receipt_date,
-            ];
-        });
+        $warehouseId = $request->query('warehouse_id') ? (int) $request->query('warehouse_id') : null;
+        $units = $this->secondUnitService->getAvailableUnitsForProduct($product, $warehouseId);
 
         return response()->json([
             'success' => true,
-            'message' => 'Daftar nomor seri (SN/IMEI) yang tersedia berhasil dimuat.',
-            'data' => $serialNumbers,
+            'message' => 'Daftar unit fisik & kondisi QC GSK Second berhasil dimuat.',
+            'is_second_unit' => true,
+            'requires_unit_selection' => false,
+            'supports_unit_selection' => count($units) > 0,
+            'data' => $units,
         ]);
     }
 
-    /**
-     * Dapatkan daftar kategori yang diizinkan untuk Unit Usaha tertentu.
-     * Mengembalikan null jika belum dikonfigurasi (akan menggunakan filter default).
-     */
     protected function getActiveCategoriesForBu(int $buId): ?array
     {
         $settingService = app(SettingService::class);
@@ -462,10 +521,6 @@ class ProductController extends Controller
         return is_array($saved) ? $saved : null;
     }
 
-    /**
-     * Dapatkan daftar merek yang diizinkan untuk Unit Usaha tertentu.
-     * Mengembalikan null jika belum dikonfigurasi.
-     */
     protected function getActiveBrandsForBu(int $buId): ?array
     {
         $settingService = app(SettingService::class);
@@ -473,9 +528,6 @@ class ProductController extends Controller
         return is_array($saved) ? $saved : null;
     }
 
-    /**
-     * Terapkan filter kurasi kategori & merek aktif ke query produk per Unit Usaha.
-     */
     protected function applyCurationFilters($query, ?int $businessUnitId): void
     {
         if ($businessUnitId) {
@@ -483,7 +535,6 @@ class ProductController extends Controller
             if ($cats !== null) {
                 $query->whereIn('categoryName', $cats);
             } else {
-                // Safety filter default: sembunyikan LDU atau DEMO jika belum dikurasi secara manual
                 $query->where(function ($q) {
                     $q->whereNull('categoryName')
                       ->orWhere(function ($sub) {
@@ -498,7 +549,6 @@ class ProductController extends Controller
                 $query->whereIn('brandName', $brands);
             }
         } else {
-            // Berlaku per unit usaha masing-masing untuk mode multi-toko
             $visibleBus = BusinessUnit::where('is_active', true)
                 ->where('is_visible_mobile', true)
                 ->get();

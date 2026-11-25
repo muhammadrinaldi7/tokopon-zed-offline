@@ -3,15 +3,17 @@
 namespace App\Services;
 
 use App\Jobs\SyncOrderToAccurateJob;
-use App\Models\BusinessUnit;
+use App\Jobs\SyncSalesOrderToAccurateJob;
+use App\Models\Branch;
+use App\Models\OnlineStockReservation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
+use App\Models\OrderShipping;
 use App\Models\ProductAccurate;
 use App\Models\ProductSerialNumber;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Models\WarehouseStock;
 use Exception;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +23,15 @@ use Illuminate\Support\Facades\Log;
 class MobileOrderService
 {
     /**
-     * Membuat order baru dari checkout Mobile App dengan penguncian stok atomik (lockForUpdate).
+     * Membuat order baru dari checkout Mobile App (SO-First Architecture).
      *
-     * @param array $data
-     * @return Order
-     * @throws Exception
+     * - Melakukan Live Accurate Stock Check (cached 30 dtk) sebelum transaksi DB.
+     * - Mendukung Multi-Warehouse:
+     *   - DELIVERY: memvalidasi stok gabungan (Total ATP) seluruh gudang Delivery aktif.
+     *   - PICK_UP : memvalidasi stok spesifik pada cabang `pickup_warehouse_id`.
+     * - TIDAK mengunci IMEI di awal untuk barang Baru / pesanan umum (IMEI di-scan saat Fulfillment).
+     * - Jika customer GSK Second memilih `unit_id` spesifik, unit tersebut dikunci secara atomik.
+     * - TIDAK membuat SO di Accurate sebelum pembayaran dikonfirmasi lunas (menjaga Accurate bersih).
      */
     public function createCheckoutOrder(array $data): Order
     {
@@ -39,114 +45,164 @@ class MobileOrderService
             throw new Exception("Keranjang belanja kosong.");
         }
 
-        $businessUnitId = $data['business_unit_id'] ?? null;
-        $warehouseId = $data['warehouse_id'] ?? null;
+        $fulfillmentType = strtoupper(trim((string) ($data['fulfillment_type'] ?? 'DELIVERY')));
+        if (!in_array($fulfillmentType, ['DELIVERY', 'PICK_UP'], true)) {
+            $fulfillmentType = 'DELIVERY';
+        }
 
-        // Auto-detect businessUnitId dari produk pertama di keranjang jika belum ditentukan
+        $businessUnitId = isset($data['business_unit_id']) ? (int) $data['business_unit_id'] : null;
+        $pickupWarehouseId = isset($data['pickup_warehouse_id'])
+            ? (int) $data['pickup_warehouse_id']
+            : (isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null);
+
+        // Auto-detect businessUnitId dari produk pertama jika belum dikirim
         if (!$businessUnitId && !empty($items)) {
             $firstProductAccurateId = $items[0]['product_accurate_id'] ?? $items[0]['product_id'] ?? null;
             if ($firstProductAccurateId) {
                 $p = ProductAccurate::find($firstProductAccurateId);
                 if ($p && $p->business_unit_id) {
-                    $businessUnitId = $p->business_unit_id;
+                    $businessUnitId = (int) $p->business_unit_id;
                 }
             }
         }
 
-        // 1. Tentukan Gudang Online Store yang valid
-        $warehouse = null;
-        if ($warehouseId) {
-            $warehouse = Warehouse::where('id', $warehouseId)->where('is_online_store', true)->first();
+        $onlineStockService = app(OnlineStockService::class);
+        $onlineStockService->releaseExpiredReservations();
+
+        // 1. Validasi Gudang Online sesuai Fulfillment Type
+        $pickupWarehouse = null;
+        $defaultOrderWarehouse = null;
+
+        if ($fulfillmentType === 'PICK_UP') {
+            if ($pickupWarehouseId) {
+                $pickupWarehouse = Warehouse::where('id', $pickupWarehouseId)
+                    ->storePickup()
+                    ->when($businessUnitId, fn($q) => $q->where('business_unit_id', $businessUnitId))
+                    ->first();
+            }
+
+            if (!$pickupWarehouse) {
+                throw new Exception("Cabang pengambilan (Store Pick Up) tidak valid atau belum diaktifkan untuk Pick Up.");
+            }
+
+            $defaultOrderWarehouse = $pickupWarehouse;
+            if (!$businessUnitId && $pickupWarehouse->business_unit_id) {
+                $businessUnitId = (int) $pickupWarehouse->business_unit_id;
+            }
+        } else {
+            // Mode DELIVERY: pastikan ada minimal 1 gudang delivery aktif untuk BU ini
+            $deliveryWarehouses = $onlineStockService->getOnlineWarehouses($businessUnitId, 'delivery');
+            if ($deliveryWarehouses->isEmpty()) {
+                throw new Exception("Tidak ada gudang online Delivery yang aktif untuk melayani pesanan toko ini.");
+            }
+            $defaultOrderWarehouse = $deliveryWarehouses->first();
+            if (!$businessUnitId && $defaultOrderWarehouse->business_unit_id) {
+                $businessUnitId = (int) $defaultOrderWarehouse->business_unit_id;
+            }
         }
 
-        if (!$warehouse && $businessUnitId) {
-            $warehouse = Warehouse::where('is_online_store', true)
-                ->where('business_unit_id', $businessUnitId)
-                ->first();
-        }
-
-        if (!$warehouse) {
-            $warehouse = Warehouse::where('is_online_store', true)->first();
-        }
-
-        if (!$warehouse) {
-            throw new Exception("Tidak ada gudang online store (is_online_store) yang aktif untuk melayani pesanan mobile.");
-        }
-
-        // Jika BU belum ditentukan, gunakan BU milik gudang online
-        if (!$businessUnitId) {
-            $businessUnitId = $warehouse->business_unit_id ?? 1;
+        // 2. Live Stock Check ke Accurate (di luar DB::transaction agar tidak menahan lock saat HTTP call)
+        $productsMap = [];
+        foreach ($items as $item) {
+            $pId = (int) ($item['product_accurate_id'] ?? 0);
+            if ($pId && !isset($productsMap[$pId])) {
+                $product = ProductAccurate::with('businessUnit')->findOrFail($pId);
+                $onlineStockService->refreshLiveStockForProduct($product);
+                $productsMap[$pId] = $product;
+            }
         }
 
         $expiryMinutes = (int) ($data['expiry_minutes'] ?? 60);
 
-        return DB::transaction(function () use ($data, $userId, $businessUnitId, $warehouse, $items, $expiryMinutes) {
+        $order = DB::transaction(function () use (
+            $data,
+            $userId,
+            $businessUnitId,
+            $fulfillmentType,
+            $pickupWarehouse,
+            $defaultOrderWarehouse,
+            $items,
+            $productsMap,
+            $expiryMinutes,
+            $onlineStockService
+        ) {
             $subtotal = 0;
             $totalDiscount = 0;
             $orderItemsToCreate = [];
+            $reservationsToCreate = [];
 
-            // 2. Kunci & Validasi Stok setiap item
+            // 3. Validasi Stok ATP & Siapkan Reservasi Atomik
             foreach ($items as $item) {
-                $productAccurateId = $item['product_accurate_id'] ?? null;
+                $productAccurateId = (int) ($item['product_accurate_id'] ?? 0);
                 $qty = (int) ($item['qty'] ?? 1);
                 if ($qty <= 0) {
                     throw new Exception("Jumlah item harus lebih dari 0.");
                 }
 
-                $product = ProductAccurate::findOrFail($productAccurateId);
+                $product = $productsMap[$productAccurateId] ?? ProductAccurate::with('businessUnit')->findOrFail($productAccurateId);
                 $price = isset($item['price']) ? (float) $item['price'] : (float) $product->base_price;
                 $discount = (float) ($item['discount_amount'] ?? 0);
 
-                // Kunci aggregate stock di warehouse_stocks
-                $stockRecord = WarehouseStock::where('warehouse_id', $warehouse->id)
-                    ->where('variant_id', $product->id)
-                    ->whereIn('variant_type', [ProductAccurate::class, 'App\\Models\\ProductAccurate', 'ProductAccurate'])
-                    ->lockForUpdate()
-                    ->first();
+                // Hitung ATP aktual (setelah live refresh & dikurangi reservasi aktif)
+                $breakdown = $onlineStockService->getProductStockBreakdown($product, refreshLiveFromAccurate: false);
 
-                $availableStock = $stockRecord ? $stockRecord->stock : 0;
-                if ($availableStock < $qty) {
-                    throw new Exception("Stok untuk produk '{$product->name}' tidak mencukupi (sisa: {$availableStock}, diminta: {$qty}).");
-                }
-
-                // Pengurangan stok agregat
-                $stockRecord->decrement('stock', $qty);
-
-                // Reservasi Serial Number jika produk memiliki SN/IMEI
+                $selectedSnModel = null;
+                $reservationWarehouseId = null;
                 $cleanSns = [];
-                if ($product->has_sn) {
-                    $requestedSns = $item['serial_numbers'] ?? [];
 
-                    if (!empty($requestedSns)) {
-                        $cleanRequested = array_values(array_filter(array_map('trim', (array) $requestedSns)));
-                        $lockedSns = ProductSerialNumber::where('warehouse_id', $warehouse->id)
-                            ->where('product_accurate_id', $product->id)
-                            ->whereIn('serial_number', $cleanRequested)
-                            ->where('status', 'Available')
-                            ->lockForUpdate()
-                            ->get();
+                // Cek apakah customer secara eksplisit memilih 1 unit spesifik (GSK Second Showcase)
+                $requestedUnitId = !empty($item['unit_id']) ? (int) $item['unit_id'] : null;
 
-                        if ($lockedSns->count() < count($cleanRequested)) {
-                            throw new Exception("Satu atau lebih IMEI/Serial Number yang dipilih untuk '{$product->name}' sudah tidak tersedia.");
+                if ($requestedUnitId) {
+                    if ($qty !== 1) {
+                        throw new Exception("Pemilihan unit spesifik ('{$product->name}') hanya berlaku untuk qty = 1 per baris.");
+                    }
+
+                    $selectedSnModel = ProductSerialNumber::where('id', $requestedUnitId)
+                        ->where('status', 'Available')
+                        ->where(function ($q) use ($product) {
+                            $q->where('product_accurate_id', $product->id)
+                                ->orWhere('item_no', $product->item_no);
+                        })
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$selectedSnModel) {
+                        throw new Exception("Unit spesifik yang dipilih untuk '{$product->name}' sudah tidak tersedia atau baru saja dipesan.");
+                    }
+
+                    // Pastikan tidak ada reservasi aktif lain untuk SN ini
+                    $snAlreadyReserved = OnlineStockReservation::active()
+                        ->where('product_serial_number_id', $selectedSnModel->id)
+                        ->exists();
+
+                    if ($snAlreadyReserved) {
+                        throw new Exception("Unit spesifik yang dipilih untuk '{$product->name}' sedang dalam proses pembayaran pelanggan lain.");
+                    }
+
+                    if ($fulfillmentType === 'PICK_UP' && $pickupWarehouse && (int) $selectedSnModel->warehouse_id !== (int) $pickupWarehouse->id) {
+                        throw new Exception("Unit spesifik yang dipilih tidak berada di cabang pengambilan '{$pickupWarehouse->name}'.");
+                    }
+
+                    // Kunci unit spesifik GSK Second
+                    $selectedSnModel->update(['status' => 'Reserved']);
+                    $reservationWarehouseId = (int) $selectedSnModel->warehouse_id;
+                    $cleanSns = [(string) $selectedSnModel->serial_number];
+                } else {
+                    // Alur SO-First: Validasi berbasis KUOTA QTY (TANPA mengunci IMEI di tahap checkout!)
+                    if ($fulfillmentType === 'PICK_UP') {
+                        $whStock = (int) ($breakdown['per_warehouse_map'][$pickupWarehouse->id] ?? 0);
+                        if ($whStock < $qty) {
+                            throw new Exception("Stok '{$product->name}' di cabang {$pickupWarehouse->name} tidak mencukupi (tersedia: {$whStock}, diminta: {$qty}).");
                         }
-
-                        ProductSerialNumber::whereIn('id', $lockedSns->pluck('id'))->update(['status' => 'Reserved']);
-                        $cleanSns = $lockedSns->pluck('serial_number')->toArray();
+                        $reservationWarehouseId = (int) $pickupWarehouse->id;
                     } else {
-                        // Auto-assign SN Available
-                        $lockedSns = ProductSerialNumber::where('warehouse_id', $warehouse->id)
-                            ->where('product_accurate_id', $product->id)
-                            ->where('status', 'Available')
-                            ->limit($qty)
-                            ->lockForUpdate()
-                            ->get();
-
-                        if ($lockedSns->count() < $qty) {
-                            throw new Exception("Unit nomor seri (IMEI/SN) berstatus 'Available' untuk '{$product->name}' tidak mencukupi.");
+                        $deliveryStock = (int) $breakdown['total_delivery_stock'];
+                        if ($deliveryStock < $qty) {
+                            throw new Exception("Stok online '{$product->name}' tidak mencukupi (tersedia: {$deliveryStock}, diminta: {$qty}).");
                         }
-
-                        ProductSerialNumber::whereIn('id', $lockedSns->pluck('id'))->update(['status' => 'Reserved']);
-                        $cleanSns = $lockedSns->pluck('serial_number')->toArray();
+                        // Pool-level reservation (warehouse_id = null) agar admin bebas pilih cabang pengirim saat fulfillment!
+                        $reservationWarehouseId = null;
                     }
                 }
 
@@ -165,9 +221,17 @@ class MobileOrderService
                     'promo_discount_amount' => 0,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : null,
                 ];
+
+                $reservationsToCreate[] = [
+                    'product_accurate_id' => $product->id,
+                    'business_unit_id' => $businessUnitId,
+                    'warehouse_id' => $reservationWarehouseId,
+                    'product_serial_number_id' => $selectedSnModel?->id,
+                    'qty' => $qty,
+                ];
             }
 
-            // 3. Generate Order Number
+            // 4. Generate Order Number
             $dateNow = now();
             $orderNumber = 'MOB-' . $dateNow->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                 Order::whereDate('order_date', $dateNow->format('Y-m-d'))
@@ -178,21 +242,21 @@ class MobileOrderService
                 STR_PAD_LEFT
             );
 
-            $shippingCost = (float) ($data['shipping_cost'] ?? 0);
+            $shippingCost = $fulfillmentType === 'PICK_UP' ? 0.0 : (float) ($data['shipping_cost'] ?? 0);
 
             $shippingSnapshot = $data['shipping_address_snapshot'] ?? [
-                'type' => 'ONLINE_DELIVERY',
-                'store' => $warehouse->name,
+                'type' => $fulfillmentType,
+                'store' => $pickupWarehouse?->name ?? $defaultOrderWarehouse?->name,
                 'customer_name' => User::find($userId)?->name ?? 'Customer',
             ];
 
             $userModel = User::find($userId);
 
-            // 3.1 Perhitungan & Validasi Kupon Diskon E-Commerce
+            // 4.1 Validasi Kupon Diskon
             $couponCode = !empty($data['coupon_code']) ? trim((string) $data['coupon_code']) : null;
             $coupon = null;
             $couponDiscount = 0.0;
-            $couponService = app(\App\Services\EcommerceCouponService::class);
+            $couponService = app(EcommerceCouponService::class);
 
             if ($couponCode) {
                 $netSubtotal = max(0, $subtotal - $totalDiscount);
@@ -204,9 +268,9 @@ class MobileOrderService
                 $couponDiscount = (float) $validation['discount'];
             }
 
-            // 3.2 Perhitungan & Validasi Penukaran Poin Loyalty
+            // 4.2 Validasi Poin Loyalty
             $redeemPoints = (int) ($data['redeem_points'] ?? 0);
-            $loyaltyService = app(\App\Services\LoyaltyService::class);
+            $loyaltyService = app(LoyaltyService::class);
             $loyaltyDiscount = 0;
 
             if ($redeemPoints > 0 && $loyaltyService->isActive()) {
@@ -219,7 +283,6 @@ class MobileOrderService
                 }
 
                 $loyaltyDiscount = $loyaltyService->calculatePointDiscount($redeemPoints);
-                // Maksimal diskon poin tidak boleh melebihi sisa tagihan belanja setelah diskon kupon
                 $netBill = max(0, ($subtotal - $totalDiscount + $shippingCost) - $couponDiscount);
                 $loyaltyDiscount = min($loyaltyDiscount, $netBill);
             } else {
@@ -227,27 +290,41 @@ class MobileOrderService
             }
 
             $grandTotal = max(0, ($subtotal - $totalDiscount + $shippingCost) - $couponDiscount - $loyaltyDiscount);
-            $initialStatus = $grandTotal == 0 ? 'PROCESSING' : 'WAITING_PAYMENT';
+            $isZeroBill = $grandTotal <= 0;
+            $initialStatus = $isZeroBill ? 'PROCESSING' : 'WAITING_PAYMENT';
+            $initialFulfillmentStatus = $isZeroBill ? 'PENDING_ALLOCATION' : null;
+            $expiresAt = $isZeroBill ? null : now()->addMinutes($expiryMinutes);
 
-            $settingService = app(\App\Services\SettingService::class);
-            
-            // Prioritas lookup Sales per Business Unit -> Fallback global
+            $settingService = app(SettingService::class);
             $defaultSalesId = $settingService->get("ecommerce_sales_{$businessUnitId}", $settingService->get('ecommerce_default_sales_id'));
             $salesId = $data['sales_id'] ?? (!empty($defaultSalesId) ? (int) $defaultSalesId : null);
 
-            // Prioritas lookup Cabang per Business Unit -> Fallback global
             $defaultBranchName = $settingService->get("ecommerce_branch_{$businessUnitId}", $settingService->get('ecommerce_default_branch_name', 'Banjarbaru'));
-            $branchId = $data['branch_id'] ?? \App\Models\Branch::where('name', $defaultBranchName)->value('id');
+            $branchId = $data['branch_id'] ?? Branch::where('name', $defaultBranchName)->value('id');
 
-            // Prioritas lookup Kasir / Handled By per Business Unit -> Fallback global
             $defaultHandledById = $settingService->get("ecommerce_handled_by_{$businessUnitId}", $settingService->get('ecommerce_default_handled_by_id'));
             $handledBy = $data['handled_by'] ?? (!empty($defaultHandledById) ? (int) $defaultHandledById : null);
 
-            // 4. Create Order
+            // Tentukan warehouse_id awal: untuk PICK_UP = pickupWarehouse, untuk DELIVERY = warehouse rekomendasi (atau unit spesifik Second)
+            $initialWarehouseId = $pickupWarehouse?->id;
+            if (!$initialWarehouseId && !empty($reservationsToCreate[0]['warehouse_id'])) {
+                $initialWarehouseId = $reservationsToCreate[0]['warehouse_id'];
+            }
+            if (!$initialWarehouseId) {
+                $suggested = $onlineStockService->suggestFulfillmentWarehouse(
+                    (int) $orderItemsToCreate[0]['product_variant_id'],
+                    (int) $orderItemsToCreate[0]['qty'],
+                    (int) $businessUnitId
+                );
+                $initialWarehouseId = $suggested?->id ?? $defaultOrderWarehouse?->id;
+            }
+
+            // 5. Create Order
             $order = Order::create([
                 'business_unit_id' => $businessUnitId,
                 'user_id' => $userId,
-                'warehouse_id' => $warehouse->id,
+                'warehouse_id' => $initialWarehouseId,
+                'pickup_warehouse_id' => $pickupWarehouse?->id,
                 'branch_id' => $branchId,
                 'sales_id' => $salesId,
                 'handled_by' => $handledBy,
@@ -263,58 +340,72 @@ class MobileOrderService
                 'loyalty_discount_amount' => $loyaltyDiscount,
                 'grand_total' => $grandTotal,
                 'order_status' => $initialStatus,
+                'fulfillment_type' => $fulfillmentType,
+                'fulfillment_status' => $initialFulfillmentStatus,
                 'order_channel' => 'MOBILE_APP',
-                'payment_expired_at' => $grandTotal == 0 ? null : now()->addMinutes($expiryMinutes),
+                'payment_expired_at' => $expiresAt,
                 'shipping_address_snapshot' => $shippingSnapshot,
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            // Eksekusi penerapan kupon diskon jika digunakan
             if ($coupon && $couponDiscount > 0) {
                 $couponService->applyCouponToOrder($coupon, $order, $userModel, $couponDiscount);
             }
 
-            // Eksekusi penukaran poin jika digunakan
             if ($redeemPoints > 0) {
                 $loyaltyService->redeemPoints($order, $redeemPoints, $userModel);
             }
 
-            // 5. Create Order Items
-            foreach ($orderItemsToCreate as $itemData) {
+            // 6. Create Order Items & Online Stock Reservations (TIDAK menyentuh warehouse_stocks!)
+            foreach ($orderItemsToCreate as $idx => $itemData) {
                 $itemData['order_id'] = $order->id;
-                OrderItem::create($itemData);
+                $orderItem = OrderItem::create($itemData);
+
+                $resPayload = $reservationsToCreate[$idx];
+                OnlineStockReservation::create([
+                    'order_id' => $order->id,
+                    'order_item_id' => $orderItem->id,
+                    'product_accurate_id' => $resPayload['product_accurate_id'],
+                    'business_unit_id' => $resPayload['business_unit_id'],
+                    'warehouse_id' => $resPayload['warehouse_id'],
+                    'product_serial_number_id' => $resPayload['product_serial_number_id'],
+                    'qty' => $resPayload['qty'],
+                    'status' => 'ACTIVE',
+                    'expires_at' => $expiresAt,
+                ]);
             }
 
-            // 6. Create Initial Payment Record
+            // 7. Create Initial Payment Record
             OrderPayment::create([
                 'order_id' => $order->id,
                 'xendit_external_id' => 'ORD-MOB-' . date('YmdHis') . rand(1000, 9999),
                 'amount' => $grandTotal,
-                'status' => $grandTotal == 0 ? 'PAID' : 'PENDING',
-                'paid_at' => $grandTotal == 0 ? now() : null,
+                'status' => $isZeroBill ? 'PAID' : 'PENDING',
+                'paid_at' => $isZeroBill ? now() : null,
                 'payment_method_id' => $data['payment_method_id'] ?? null,
             ]);
 
-            // 7. Catat komisi referral jika ada
+            // 8. Catat komisi referral jika ada
             try {
-                app(\App\Services\ReferralService::class)->recordOrderCommission($order);
+                app(ReferralService::class)->recordOrderCommission($order);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Gagal mencatat komisi referral untuk pesanan #{{$order->order_number}}: " . $e->getMessage());
+                Log::warning("Gagal mencatat komisi referral untuk pesanan #{$order->order_number}: " . $e->getMessage());
             }
 
-            return $order->load(['items', 'payments', 'warehouse']);
+            return $order->load(['items', 'payments', 'warehouse', 'pickupWarehouse']);
         });
+
+        // Jika tagihan Rp 0 (lunas via kupon/poin), langsung terbitkan Sales Order ke Accurate
+        if ($order->order_status === 'PROCESSING') {
+            SyncSalesOrderToAccurateJob::dispatch($order->id);
+        }
+
+        return $order;
     }
 
     /**
-     * Upload bukti transfer pembayaran manual oleh pelanggan via Spatie MediaLibrary.
-     * Mengubah status order menjadi WAITING_VERIFICATION dan mengosongkan payment_expired_at.
-     *
-     * @param Order $order
-     * @param UploadedFile|string $file
-     * @param int|null $paymentMethodId
-     * @return Order
-     * @throws Exception
+     * Upload bukti transfer pembayaran manual oleh pelanggan.
+     * Menjadikan reservasi stok permanen (tidak hangus) selama menunggu verifikasi admin.
      */
     public function uploadPaymentProof(Order $order, $file, ?int $paymentMethodId = null): Order
     {
@@ -335,38 +426,42 @@ class MobileOrderService
             $payment->update(['payment_method_id' => $paymentMethodId]);
         }
 
-        // Lampirkan bukti transfer ke Spatie MediaLibrary
         if ($file instanceof UploadedFile) {
             $payment->addMedia($file)->toMediaCollection('payment_proof');
         } elseif (is_string($file) && file_exists($file)) {
             $payment->addMedia($file)->toMediaCollection('payment_proof');
         }
 
-        // Hapus timer expire agar order tidak hangus saat menunggu verifikasi admin/CS
         $order->update([
             'order_status' => 'WAITING_VERIFICATION',
             'payment_expired_at' => null,
         ]);
 
-        // Kirim notifikasi webhook Telegram jika dikonfigurasi
+        // Lepaskan timer expiry pada reservasi stok agar tidak hangus saat menunggu verifikasi admin
+        OnlineStockReservation::where('order_id', $order->id)
+            ->where('status', 'ACTIVE')
+            ->update(['expires_at' => null]);
+
         $this->sendTelegramNotification($order, 'WAITING_VERIFICATION');
 
         return $order->refresh()->load(['payments.media']);
     }
 
     /**
-     * Verifikasi dan setujui pembayaran (oleh Admin Manual atau Webhook Xendit).
-     * Mengubah order menjadi COMPLETED, SN menjadi Sold, dan men-dispatch Accurate Queue Job.
+     * TAHAP 1 ADMIN: Verifikasi & Setujui Pembayaran Lunas (Manual Admin / Webhook Xendit).
      *
-     * @param Order $order
-     * @param User|null $actor
-     * @return Order
-     * @throws Exception
+     * - Mengubah status order menjadi `PROCESSING` & `fulfillment_status = PENDING_ALLOCATION`.
+     * - Men-dispatch `SyncSalesOrderToAccurateJob` untuk membuat Sales Order (SO) di Accurate TANPA IMEI.
+     * - Jika `$overrides['immediate_fulfill'] = true` (opsional), langsung lanjutkan ke `fulfillOrder()`.
      */
     public function approvePayment(Order $order, ?User $actor = null, array $overrides = []): Order
     {
         if ($order->order_status === 'COMPLETED') {
             return $order;
+        }
+
+        if ($order->order_status === 'PROCESSING' && !empty($overrides['immediate_fulfill'])) {
+            return $this->fulfillOrder($order, $actor, $overrides);
         }
 
         DB::transaction(function () use ($order, $actor, $overrides) {
@@ -376,40 +471,22 @@ class MobileOrderService
             $branchName = $overrides['branch_name'] ?? null;
 
             if ($branchName && !$branchId) {
-                $b = \App\Models\Branch::where('name', $branchName)->first();
+                $b = Branch::where('name', $branchName)->first();
                 if ($b) {
                     $branchId = $b->id;
                 }
             }
 
-            // 1. Update Order Status & Data Overrides
             $orderUpdates = [
-                'order_status' => 'COMPLETED',
+                'order_status' => 'PROCESSING',
+                'fulfillment_status' => $order->fulfillment_status ?: 'PENDING_ALLOCATION',
                 'handled_by' => $actor ? $actor->id : $order->handled_by,
                 'payment_expired_at' => null,
             ];
 
-            if ($warehouseId && $warehouseId != $order->warehouse_id) {
-                // Jika gudang diganti oleh admin saat approval, migrasikan kuota stok
-                $oldWhId = $order->warehouse_id;
-                $newWhId = $warehouseId;
-                foreach ($order->items as $item) {
-                    $oldStock = WarehouseStock::where('warehouse_id', $oldWhId)
-                        ->where('variant_id', $item->product_variant_id)
-                        ->first();
-                    if ($oldStock) {
-                        $oldStock->increment('stock', (int) $item->qty);
-                    }
-                    $newStock = WarehouseStock::where('warehouse_id', $newWhId)
-                        ->where('variant_id', $item->product_variant_id)
-                        ->first();
-                    if ($newStock) {
-                        $newStock->decrement('stock', (int) $item->qty);
-                    }
-                }
-                $orderUpdates['warehouse_id'] = $newWhId;
+            if ($warehouseId) {
+                $orderUpdates['warehouse_id'] = (int) $warehouseId;
             }
-
             if ($salesId !== $order->sales_id) {
                 $orderUpdates['sales_id'] = $salesId;
             }
@@ -417,31 +494,9 @@ class MobileOrderService
                 $orderUpdates['branch_id'] = $branchId;
             }
 
-            // Ganti IMEI jika admin menukar nomor seri di modal verifikasi
-            if (!empty($overrides['item_sns']) && is_array($overrides['item_sns'])) {
-                foreach ($overrides['item_sns'] as $itemId => $newSn) {
-                    $item = $order->items()->find($itemId);
-                    if ($item && $item->serial_number !== $newSn) {
-                        $oldSns = !empty($item->serial_number) ? array_map('trim', explode(',', $item->serial_number)) : [];
-                        $newSns = !empty($newSn) ? array_map('trim', explode(',', $newSn)) : [];
-
-                        if (!empty($oldSns)) {
-                            ProductSerialNumber::whereIn('serial_number', $oldSns)
-                                ->where('status', 'Reserved')
-                                ->update(['status' => 'Available']);
-                        }
-                        if (!empty($newSns)) {
-                            ProductSerialNumber::whereIn('serial_number', $newSns)
-                                ->update(['status' => 'Reserved']);
-                        }
-                        $item->update(['serial_number' => $newSn]);
-                    }
-                }
-            }
-
             $order->update($orderUpdates);
 
-            // 2. Update Order Payments status PAID
+            // Tandai pembayaran sebagai PAID
             $order->payments()
                 ->where('status', '!=', 'PAID')
                 ->update([
@@ -449,45 +504,188 @@ class MobileOrderService
                     'paid_at' => now(),
                 ]);
 
-            // 3. Update status Serial Number dari 'Reserved' menjadi 'Sold'
-            $order->refresh();
-            $allSns = [];
-            foreach ($order->items as $item) {
-                if (!empty($item->serial_number)) {
-                    $sns = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
-                    $allSns = array_merge($allSns, $sns);
-                }
-            }
+            // Pastikan reservasi stok tidak pernah kadaluarsa
+            OnlineStockReservation::where('order_id', $order->id)
+                ->where('status', 'ACTIVE')
+                ->update(['expires_at' => null]);
 
-            if (!empty($allSns)) {
-                ProductSerialNumber::whereIn('serial_number', $allSns)
-                    ->where('status', 'Reserved')
-                    ->update(['status' => 'Sold']);
-            }
-
-            // 4. Catat perolehan Poin Loyalty atas transaksi selesai
+            // Catat perolehan Poin Loyalty (idempotent di LoyaltyService)
             try {
-                app(\App\Services\LoyaltyService::class)->earnPoints($order);
+                app(LoyaltyService::class)->earnPoints($order);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Gagal menambahkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+                Log::warning("Gagal menambahkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
             }
         });
 
-        // 4. Dispatch Queue Job untuk sinkronisasi ke Accurate Online di background
-        SyncOrderToAccurateJob::dispatch($order->id);
+        // Terbitkan Sales Order (SO) di Accurate di background (TANPA IMEI!)
+        SyncSalesOrderToAccurateJob::dispatch($order->id);
+
+        if (!empty($overrides['immediate_fulfill'])) {
+            return $this->fulfillOrder($order->refresh(), $actor, $overrides);
+        }
 
         return $order->refresh();
     }
 
     /**
-     * Membatalkan atau meng-expire pesanan Mobile.
-     * Mengembalikan kuota warehouse_stocks dan memulihkan status ProductSerialNumber ke 'Available'.
+     * TAHAP 2 ADMIN (FULFILLMENT): Alokasi Cabang Pengirim, Scan IMEI Aktual & Konfirmasi Kirim / Siap Diambil.
      *
-     * @param Order $order
-     * @param string $reason
-     * @param User|null $actor
-     * @return Order
-     * @throws Exception
+     * - Admin bebas memilih gudang cabang mana pun yang memiliki stok (untuk Delivery).
+     * - Memvalidasi & menyimpan IMEI aktual yang di-scan untuk item `has_sn = true`.
+     * - Menyimpan info kurir & resi ke tabel `order_shippings` (jika Delivery).
+     * - Mengubah order menjadi `COMPLETED` & men-dispatch `SyncOrderToAccurateJob`
+     *   untuk menerbitkan Sales Invoice (SI) terhubung ke `salesOrderNumber` + `detailSerialNumber` + SR.
+     */
+    public function fulfillOrder(Order $order, ?User $actor = null, array $fulfillmentData = []): Order
+    {
+        if ($order->order_status === 'COMPLETED' && !empty($order->fulfilled_at)) {
+            return $order;
+        }
+
+        if ($order->order_status === 'CANCELLED') {
+            throw new Exception("Order #{$order->order_number} sudah dibatalkan dan tidak dapat dipenuhi.");
+        }
+
+        DB::transaction(function () use ($order, $actor, $fulfillmentData) {
+            $order->loadMissing(['items.variant', 'payments', 'shipping']);
+
+            $chosenWarehouseId = isset($fulfillmentData['warehouse_id']) && $fulfillmentData['warehouse_id']
+                ? (int) $fulfillmentData['warehouse_id']
+                : ($order->pickup_warehouse_id ?: $order->warehouse_id);
+
+            if (!$chosenWarehouseId) {
+                throw new Exception("Gudang cabang pemenuhan wajib dipilih sebelum menerbitkan Faktur (SI).");
+            }
+
+            $salesId = array_key_exists('sales_id', $fulfillmentData) ? $fulfillmentData['sales_id'] : $order->sales_id;
+            $branchId = array_key_exists('branch_id', $fulfillmentData) ? $fulfillmentData['branch_id'] : $order->branch_id;
+            $branchName = $fulfillmentData['branch_name'] ?? null;
+
+            if ($branchName && !$branchId) {
+                $b = Branch::where('name', $branchName)->first();
+                if ($b) {
+                    $branchId = $b->id;
+                }
+            }
+
+            $itemSns = $fulfillmentData['item_sns'] ?? [];
+            $soldSerialNumbers = [];
+
+            foreach ($order->items as $item) {
+                $pa = ProductAccurate::find($item->product_variant_id);
+                $needsSn = (bool) ($pa?->has_sn ?? false);
+
+                $rawSnInput = array_key_exists($item->id, $itemSns)
+                    ? (string) $itemSns[$item->id]
+                    : (string) ($item->serial_number ?? '');
+
+                $newSns = array_values(array_filter(array_map('trim', explode(',', $rawSnInput))));
+
+                if ($needsSn && count($newSns) < (int) $item->qty) {
+                    throw new Exception("Produk '{$item->product_name}' wajib memiliki {$item->qty} nomor IMEI/SN sebelum dikirim/diselesaikan.");
+                }
+
+                // Jika sebelumnya ada SN yang di-reserve tapi diganti oleh admin, lepaskan SN lama ke Available
+                $oldSns = array_values(array_filter(array_map('trim', explode(',', (string) ($item->serial_number ?? '')))));
+                $releasedOldSns = array_diff($oldSns, $newSns);
+                if (!empty($releasedOldSns)) {
+                    ProductSerialNumber::whereIn('serial_number', $releasedOldSns)
+                        ->where('status', 'Reserved')
+                        ->update(['status' => 'Available']);
+                }
+
+                $joinedNewSn = !empty($newSns) ? implode(', ', $newSns) : null;
+                if ($joinedNewSn !== $item->serial_number) {
+                    $item->update(['serial_number' => $joinedNewSn]);
+                }
+
+                if (!empty($newSns)) {
+                    $soldSerialNumbers = array_merge($soldSerialNumbers, $newSns);
+                }
+
+                // Tandai reservasi item sebagai FULFILLED dan catat gudang pemenuhan aktual
+                $firstSnId = !empty($newSns)
+                    ? ProductSerialNumber::where('serial_number', $newSns[0])->value('id')
+                    : null;
+
+                OnlineStockReservation::where('order_item_id', $item->id)
+                    ->where('status', 'ACTIVE')
+                    ->update([
+                        'warehouse_id' => $chosenWarehouseId,
+                        'product_serial_number_id' => $firstSnId,
+                        'status' => 'FULFILLED',
+                        'expires_at' => null,
+                    ]);
+            }
+
+            // Tandai seluruh IMEI aktual yang dikirim menjadi Sold
+            if (!empty($soldSerialNumbers)) {
+                ProductSerialNumber::whereIn('serial_number', $soldSerialNumbers)
+                    ->update([
+                        'status' => 'Sold',
+                        'warehouse_id' => $chosenWarehouseId,
+                    ]);
+            }
+
+            // Simpan informasi pengiriman (Kurir & Resi) ke tabel `order_shippings` yang sudah ada
+            $courierCompany = trim((string) ($fulfillmentData['courier_company'] ?? ''));
+            $courierType = trim((string) ($fulfillmentData['courier_type'] ?? ''));
+            $trackingNumber = trim((string) ($fulfillmentData['tracking_number'] ?? ''));
+
+            if ($courierCompany !== '' || $trackingNumber !== '') {
+                OrderShipping::updateOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'courier_company' => $courierCompany ?: ($order->shipping?->courier_company ?? 'KURIR_TOKO'),
+                        'courier_type' => $courierType ?: ($order->shipping?->courier_type ?? 'REGULER'),
+                        'tracking_number' => $trackingNumber ?: $order->shipping?->tracking_number,
+                        'shipping_cost' => (float) ($order->shipping_cost ?? 0),
+                        'status' => $order->fulfillment_type === 'PICK_UP' ? 'PICKED_UP' : 'SHIPPED',
+                    ]
+                );
+            }
+
+            $defaultFulfillmentStatus = $order->fulfillment_type === 'PICK_UP' ? 'READY_FOR_PICKUP' : 'SHIPPED';
+            $targetFulfillmentStatus = strtoupper(trim((string) ($fulfillmentData['fulfillment_status'] ?? $defaultFulfillmentStatus)));
+
+            // Pastikan payment sudah PAID
+            $order->payments()
+                ->where('status', '!=', 'PAID')
+                ->update([
+                    'status' => 'PAID',
+                    'paid_at' => now(),
+                ]);
+
+            $order->update([
+                'warehouse_id' => $chosenWarehouseId,
+                'branch_id' => $branchId,
+                'sales_id' => $salesId,
+                'handled_by' => $actor ? $actor->id : $order->handled_by,
+                'order_status' => 'COMPLETED',
+                'fulfillment_status' => $targetFulfillmentStatus,
+                'fulfilled_at' => now(),
+                'fulfilled_by' => $actor?->id,
+                'payment_expired_at' => null,
+            ]);
+
+            // Pastikan poin loyalty sudah tercatat (idempotent)
+            try {
+                app(LoyaltyService::class)->earnPoints($order);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal menambahkan poin loyalty saat fulfillment order #{$order->order_number}: " . $e->getMessage());
+            }
+        });
+
+        // Terbitkan Sales Invoice (SI link SO + IMEI aktual) & Sales Receipt (SR) ke Accurate di background
+        SyncOrderToAccurateJob::dispatch($order->id);
+
+        return $order->refresh()->load(['items', 'warehouse', 'pickupWarehouse', 'shipping']);
+    }
+
+    /**
+     * Membatalkan atau meng-expire pesanan Mobile.
+     * Melepaskan `online_stock_reservations` (tanpa mengotak-atik `warehouse_stocks`),
+     * memulihkan SN jika ada unit Second spesifik yang sempat di-reserve, dan menutup SO Accurate jika sudah dibuat.
      */
     public function cancelOrExpireOrder(Order $order, string $reason = 'EXPIRED', ?User $actor = null): Order
     {
@@ -499,22 +697,22 @@ class MobileOrderService
             return $order;
         }
 
-        return DB::transaction(function () use ($order, $reason, $actor) {
-            $warehouseId = $order->warehouse_id;
+        $soNumberToClose = $order->accurate_so_number;
+        $dbSource = $order->businessUnit?->code ?: 'syihab';
 
-            // 1. Kembalikan stok agregat di warehouse_stocks
-            foreach ($order->items as $item) {
-                if ($warehouseId) {
-                    $stockRecord = WarehouseStock::where('warehouse_id', $warehouseId)
-                        ->where('variant_id', $item->product_variant_id)
-                        ->whereIn('variant_type', [ProductAccurate::class, 'App\\Models\\ProductAccurate', 'ProductAccurate'])
-                        ->first();
+        $updated = DB::transaction(function () use ($order, $reason, $actor) {
+            $newResStatus = $reason === 'PAYMENT_EXPIRED' ? 'EXPIRED' : 'RELEASED';
 
-                    if ($stockRecord) {
-                        $stockRecord->increment('stock', (int) $item->qty);
-                    }
-                }
-            }
+            // 1. Lepaskan reservasi kuota stok online
+            $reservedSnIds = OnlineStockReservation::where('order_id', $order->id)
+                ->where('status', 'ACTIVE')
+                ->whereNotNull('product_serial_number_id')
+                ->pluck('product_serial_number_id')
+                ->all();
+
+            OnlineStockReservation::where('order_id', $order->id)
+                ->where('status', 'ACTIVE')
+                ->update(['status' => $newResStatus]);
 
             // 2. Pulihkan status ProductSerialNumber dari 'Reserved' ke 'Available'
             $allSns = [];
@@ -525,6 +723,11 @@ class MobileOrderService
                 }
             }
 
+            if (!empty($reservedSnIds)) {
+                ProductSerialNumber::whereIn('id', $reservedSnIds)
+                    ->where('status', 'Reserved')
+                    ->update(['status' => 'Available']);
+            }
             if (!empty($allSns)) {
                 ProductSerialNumber::whereIn('serial_number', $allSns)
                     ->where('status', 'Reserved')
@@ -540,33 +743,41 @@ class MobileOrderService
             $notesAddition = "[Dibatalkan: {$reason}]";
             $order->update([
                 'order_status' => 'CANCELLED',
+                'fulfillment_status' => 'CANCELLED',
                 'notes' => trim(($order->notes ? $order->notes . ' ' : '') . $notesAddition),
             ]);
 
             // 5. Kembalikan poin loyalty jika pernah menukar atau memperoleh poin
             try {
-                app(\App\Services\LoyaltyService::class)->refundPoints($order, $actor);
+                app(LoyaltyService::class)->refundPoints($order, $actor);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+                Log::warning("Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
             }
 
             // 6. Kembalikan kuota voucher jika pernah digunakan
             try {
-                app(\App\Services\EcommerceCouponService::class)->rollbackCoupon($order);
+                app(EcommerceCouponService::class)->rollbackCoupon($order);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Gagal rollback kupon untuk order #{$order->order_number}: " . $e->getMessage());
+                Log::warning("Gagal rollback kupon untuk order #{$order->order_number}: " . $e->getMessage());
             }
 
             return $order->refresh();
         });
+
+        // Jika order dibatalkan SETELAH SO sempat terbuat di Accurate, tutup SO secara bersih
+        if (!empty($soNumberToClose)) {
+            try {
+                app(AccurateService::class)->closeSalesOrder($soNumberToClose, $dbSource);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal menutup SO Accurate #{$soNumberToClose} saat cancel Order #{$order->order_number}: " . $e->getMessage());
+            }
+        }
+
+        return $updated;
     }
 
     /**
      * Kirim notifikasi Telegram ke webhook Business Unit terkait.
-     *
-     * @param Order $order
-     * @param string $event
-     * @return void
      */
     protected function sendTelegramNotification(Order $order, string $event): void
     {
