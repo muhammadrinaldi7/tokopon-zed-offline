@@ -25,8 +25,13 @@ class OnlineStockService
 
     /**
      * Ambil daftar gudang online aktif sesuai mode (delivery | pickup | any).
+     * Mendukung single atau multi business_unit_id serta filter kota (case-insensitive).
+     *
+     * @param int|array<int>|null $businessUnitId
+     * @param string $mode
+     * @param array<string>|null $cities
      */
-    public function getOnlineWarehouses(?int $businessUnitId = null, string $mode = 'any'): Collection
+    public function getOnlineWarehouses(int|array|null $businessUnitId = null, string $mode = 'any', ?array $cities = null): Collection
     {
         $query = Warehouse::query();
 
@@ -38,12 +43,32 @@ class OnlineStockService
             $query->onlineStore();
         }
 
-        if ($businessUnitId) {
+        if (is_array($businessUnitId)) {
+            $buIds = array_values(array_unique(array_filter(array_map('intval', $businessUnitId), fn($id) => $id > 0)));
+            if (!empty($buIds)) {
+                $query->whereIn('business_unit_id', $buIds);
+            } else {
+                $query->whereHas('businessUnit', function ($buQ) {
+                    $buQ->where('is_active', true)->where('is_visible_mobile', true);
+                });
+            }
+        } elseif ($businessUnitId) {
             $query->where('business_unit_id', $businessUnitId);
         } else {
             $query->whereHas('businessUnit', function ($buQ) {
                 $buQ->where('is_active', true)->where('is_visible_mobile', true);
             });
+        }
+
+        if (!empty($cities)) {
+            $lowerCities = array_values(array_unique(array_filter(array_map(
+                fn($c) => mb_strtolower(trim((string) $c)),
+                $cities
+            ))));
+            if (!empty($lowerCities)) {
+                $placeholders = implode(',', array_fill(0, count($lowerCities), '?'));
+                $query->whereRaw("LOWER(TRIM(city)) IN ({$placeholders})", $lowerCities);
+            }
         }
 
         return $query->orderBy('fulfillment_priority')->orderBy('name')->get();

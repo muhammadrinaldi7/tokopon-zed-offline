@@ -823,7 +823,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 <div className="p-2.5 border-t border-slate-800/80 bg-[#080C14] space-y-2 shrink-0">
                     {/* Kembali ke POS Toko */}
                     <a
-                        href="/zoffline"
+                        href="/"
                         className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 transition-all group ${
                             isCollapsed && !mobileOpen ? 'justify-center px-0 h-9' : 'h-9'
                         }`}

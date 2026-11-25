@@ -198,6 +198,8 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     // 2. Katalog Produk Toko Online
     Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
         ->name('api.mobile.products.index');
+    Route::get('/products/filters', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'filters'])
+        ->name('api.mobile.products.filters');
     Route::get('/products/categories', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'categories'])
         ->name('api.mobile.products.categories');
     Route::get('/products/brands', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'brands'])
@@ -264,4 +266,33 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         Route::post('/withdraw', [\App\Http\Controllers\Api\Mobile\ReferralController::class, 'withdraw'])
             ->name('withdraw');
     });
+});
+
+// ============================================
+// UNIFIED CATALOG & STORE API (WEB E-COMMERCE & MOBILE ALIAS)
+// ============================================
+Route::prefix('v1/catalog')->middleware('throttle:120,1')->name('api.catalog.')->group(function () {
+    Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
+        ->name('business-units.index');
+    Route::get('/warehouses', [\App\Http\Controllers\Api\Mobile\WarehouseController::class, 'index'])
+        ->name('warehouses.index');
+    Route::get('/banners', [\App\Http\Controllers\Api\Mobile\BannerController::class, 'index'])
+        ->name('banners.index');
+    Route::get('/flash-sales', [\App\Http\Controllers\Api\Mobile\FlashSaleController::class, 'index'])
+        ->name('flash-sales.index');
+
+    Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
+        ->name('products.index');
+    Route::get('/products/filters', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'filters'])
+        ->name('products.filters');
+    Route::get('/products/categories', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'categories'])
+        ->name('products.categories');
+    Route::get('/products/brands', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'brands'])
+        ->name('products.brands');
+    Route::get('/products/{id}', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'show'])
+        ->name('products.show');
+    Route::get('/products/{id}/units', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
+        ->name('products.units');
+    Route::get('/products/{id}/serial-numbers', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
+        ->name('products.serial-numbers');
 });

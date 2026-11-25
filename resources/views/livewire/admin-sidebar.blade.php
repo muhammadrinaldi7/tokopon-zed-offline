@@ -28,6 +28,12 @@
             $inactiveIconClass = 'opacity-70 text-[#262626] font-normal';
         @endphp
 
+        <a href="/" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('/') ? $activeClass : $inactiveClass }}">
+            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Dashboard</span><span
+                class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                x-show="sidebarCollapsed" style="display:none;" x-cloak>Kembali Ke Home</span>
+        </a>
         <a href="/admin/dashboard" wire:navigate
             class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.dashboard') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 {{ request()->routeIs('admin.dashboard') ? $activeIconClass : $inactiveIconClass }}"
@@ -41,26 +47,26 @@
         </a>
 
         {{-- Chat CS (Disembunyikan sementara dari Sidebar Admin) --}}
-        @if(false)
-        @can('access-cs-chat')
-            <a href="/admin/cs-chat" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.cs-chat') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.cs-chat') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="flex-1 whitespace-nowrap transition-opacity">Chat CS</span><span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
-                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Chat CS</span>
-                @if ($unreadCount > 0)
-                    <span
-                        class="ml-auto bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                        {{ $unreadCount > 99 ? '99+' : $unreadCount }}
-                    </span>
-                @endif
-            </a>
-        @endcan
+        @if (false)
+            @can('access-cs-chat')
+                <a href="/admin/cs-chat" wire:navigate
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.cs-chat') ? $activeClass : $inactiveClass }}">
+                    <svg class="w-5 h-5 {{ request()->routeIs('admin.cs-chat') ? $activeIconClass : $inactiveIconClass }}"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="flex-1 whitespace-nowrap transition-opacity">Chat CS</span><span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Chat CS</span>
+                    @if ($unreadCount > 0)
+                        <span
+                            class="ml-auto bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                            {{ $unreadCount > 99 ? '99+' : $unreadCount }}
+                        </span>
+                    @endif
+                </a>
+            @endcan
         @endif
 
         <!--<a href="#"-->
@@ -149,7 +155,8 @@
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                     <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pemakaian Inventaris</span>
-                    <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Pemakaian Inventaris</span>
                 </a>
             @endcan
@@ -162,7 +169,8 @@
                         d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Stock Opname</span>
-                <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Stock Opname</span>
             </a>
             {{-- @can('view-warehouse-stocks')
@@ -256,7 +264,8 @@
                                 $openIssuesCount = \App\Models\AccurateSyncIssue::where('status', 'open')->count();
                             @endphp
                             @if ($openIssuesCount > 0)
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                                <span
+                                    class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
                                     {{ $openIssuesCount > 99 ? '99+' : $openIssuesCount }}
                                 </span>
                             @endif
@@ -268,14 +277,15 @@
                                 $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
                                     ->where(function ($q) {
                                         $q->whereNull('accurate_invoice_no')
-                                          ->orWhere('accurate_invoice_no', '')
-                                          ->orWhere('accurate_sync_status', 'PENDING');
+                                            ->orWhere('accurate_invoice_no', '')
+                                            ->orWhere('accurate_sync_status', 'PENDING');
                                     })
                                     ->where('created_at', '>=', now()->subDays(7))
                                     ->count();
                             @endphp
                             @if ($pendingSalesCount > 0)
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                                <span
+                                    class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
                                     {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
                                 </span>
                             @endif
@@ -353,9 +363,11 @@
                 <div class="flex items-center gap-3">
                     <svg class="w-5 h-5 {{ request()->routeIs('admin.accurate.sales-sync-logs') ? $activeIconClass : $inactiveIconClass }}"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Antrean Sync Accurate</span><span
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Antrean Sync
+                        Accurate</span><span
                         class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Antrean Sync Accurate</span>
                 </div>
@@ -363,14 +375,15 @@
                     $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
                         ->where(function ($q) {
                             $q->whereNull('accurate_invoice_no')
-                              ->orWhere('accurate_invoice_no', '')
-                              ->orWhere('accurate_sync_status', 'PENDING');
+                                ->orWhere('accurate_invoice_no', '')
+                                ->orWhere('accurate_sync_status', 'PENDING');
                         })
                         ->where('created_at', '>=', now()->subDays(7))
                         ->count();
                 @endphp
                 @if ($pendingSalesCount > 0)
-                    <span x-show="!sidebarCollapsed" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                    <span x-show="!sidebarCollapsed"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
                         {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
                     </span>
                 @endif
@@ -688,7 +701,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Duplikat Pengguna</span><span
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Duplikat
+                    Pengguna</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Duplikat Pengguna</span>
             </a>
@@ -784,7 +798,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Integrasi WhatsApp</span><span
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Integrasi
+                    WhatsApp</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Integrasi WhatsApp</span>
             </a>
