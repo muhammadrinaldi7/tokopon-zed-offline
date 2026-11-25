@@ -69,6 +69,10 @@ class SettingService
                 return (int) $setting->value;
             }
 
+            if ($setting->type === 'float') {
+                return (float) $setting->value;
+            }
+
             return $setting->value;
         });
     }

@@ -21,6 +21,8 @@ class CatalogSettings extends Component
     public bool $tradeinGroupOldDevices = true;
     public bool $tradeinGroupTargetDevices = true;
     public string $tradeinSecondPriceSource = 'custom_fallback';
+    public float|string $tradeinSecondAccurateMarkupPercent = 0;
+    public int $tradeinSecondAccurateRounding = 0;
     public string $tradeinOldPriceStrategy = 'min';
     public string $tradeinTargetPriceStrategy = 'min';
     public bool $tradeinExcludeAccessories = true;
@@ -44,6 +46,8 @@ class CatalogSettings extends Component
         $this->tradeinGroupOldDevices = (bool) $settingService->get('tradein_group_old_devices', true);
         $this->tradeinGroupTargetDevices = (bool) $settingService->get('tradein_group_target_devices', true);
         $this->tradeinSecondPriceSource = (string) $settingService->get('tradein_second_price_source', 'custom_fallback');
+        $this->tradeinSecondAccurateMarkupPercent = (float) $settingService->get('tradein_second_accurate_markup_percent', 0);
+        $this->tradeinSecondAccurateRounding = (int) $settingService->get('tradein_second_accurate_rounding', 0);
         $this->tradeinOldPriceStrategy = (string) $settingService->get('tradein_old_price_strategy', 'min');
         $this->tradeinTargetPriceStrategy = (string) $settingService->get('tradein_target_price_strategy', 'min');
         $this->tradeinExcludeAccessories = (bool) $settingService->get('tradein_exclude_accessories', true);
@@ -86,6 +90,8 @@ class CatalogSettings extends Component
             'tradeinGroupOldDevices' => 'boolean',
             'tradeinGroupTargetDevices' => 'boolean',
             'tradeinSecondPriceSource' => 'required|in:custom_fallback,custom_only,accurate_only',
+            'tradeinSecondAccurateMarkupPercent' => 'required|numeric|min:0|max:200',
+            'tradeinSecondAccurateRounding' => 'required|integer|in:0,1000,10000,50000,100000',
             'tradeinOldPriceStrategy' => 'required|in:min,max',
             'tradeinTargetPriceStrategy' => 'required|in:min,max',
             'tradeinExcludeAccessories' => 'boolean',
@@ -103,6 +109,8 @@ class CatalogSettings extends Component
         $settingService->set('tradein_group_old_devices', $this->tradeinGroupOldDevices, 'boolean');
         $settingService->set('tradein_group_target_devices', $this->tradeinGroupTargetDevices, 'boolean');
         $settingService->set('tradein_second_price_source', $this->tradeinSecondPriceSource, 'string');
+        $settingService->set('tradein_second_accurate_markup_percent', (float) $this->tradeinSecondAccurateMarkupPercent, 'float');
+        $settingService->set('tradein_second_accurate_rounding', (int) $this->tradeinSecondAccurateRounding, 'integer');
         $settingService->set('tradein_old_price_strategy', $this->tradeinOldPriceStrategy, 'string');
         $settingService->set('tradein_target_price_strategy', $this->tradeinTargetPriceStrategy, 'string');
         $settingService->set('tradein_exclude_accessories', $this->tradeinExcludeAccessories, 'boolean');

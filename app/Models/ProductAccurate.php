@@ -93,12 +93,19 @@ class ProductAccurate extends Model implements HasMedia
 
     /**
      * Hitung harga jual efektif untuk fitur Trade-In berdasarkan pengaturan sumber harga BU Second.
+     * Jika mengambil harga dari Accurate (`base_price`), dapat diberikan persentase up harga (markup)
+     * serta pembulatan kelipatan (misal Rp 10.000 / Rp 50.000 / Rp 100.000) secara dinamis dari Pengaturan.
      *
-     * @param string $secondPriceSource 'custom_fallback' | 'custom_only' | 'accurate_only'
+     * @param string $secondPriceSource     'custom_fallback' | 'custom_only' | 'accurate_only'
+     * @param float  $accurateMarkupPercent Persentase up harga khusus saat memakai harga Accurate (0 = tanpa up)
+     * @param int    $roundingStep          Kelipatan pembulatan ke atas saat markup aktif (0 = tanpa pembulatan kelipatan)
      * @return float
      */
-    public function getEffectiveTradeInSellPrice(string $secondPriceSource = 'custom_fallback'): float
-    {
+    public function getEffectiveTradeInSellPrice(
+        string $secondPriceSource = 'custom_fallback',
+        float $accurateMarkupPercent = 0.0,
+        int $roundingStep = 0
+    ): float {
         if ((int) $this->business_unit_id !== 2) {
             return (float) ($this->base_price ?? 0);
         }
@@ -106,10 +113,22 @@ class ProductAccurate extends Model implements HasMedia
         $custom = (float) ($this->custom_sell_price ?? 0);
         $accurate = (float) ($this->base_price ?? 0);
 
+        $markedUpAccurate = 0.0;
+        if ($accurate > 0) {
+            $safeMarkup = max(0.0, $accurateMarkupPercent);
+            $calculated = round($accurate * (1 + ($safeMarkup / 100)));
+
+            if ($safeMarkup > 0 && $roundingStep > 0) {
+                $calculated = ceil($calculated / $roundingStep) * $roundingStep;
+            }
+
+            $markedUpAccurate = (float) $calculated;
+        }
+
         return match ($secondPriceSource) {
             'custom_only' => $custom > 0 ? $custom : 0.0,
-            'accurate_only' => $accurate > 0 ? $accurate : 0.0,
-            default => $custom > 0 ? $custom : ($accurate > 0 ? $accurate : 0.0),
+            'accurate_only' => $markedUpAccurate,
+            default => $custom > 0 ? $custom : $markedUpAccurate,
         };
     }
 

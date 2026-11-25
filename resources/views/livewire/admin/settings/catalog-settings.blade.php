@@ -181,19 +181,93 @@
                 </label>
             </div>
 
-            {{-- Sumber Harga Jual BU Second --}}
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1.5">Sumber Harga Jual Unit Bisnis Second (BU 2)</label>
-                <select wire:model="tradeinSecondPriceSource"
-                    class="w-full text-sm rounded-lg border-gray-300 px-4 py-3 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4] transition-all bg-white">
-                    <option value="custom_fallback">Utamakan Custom Sell Price (Excel), Fallback ke Harga Accurate [Rekomendasi]</option>
-                    <option value="custom_only">Hanya Custom Sell Price (Excel) — Sembunyikan produk yang belum diatur di Excel</option>
-                    <option value="accurate_only">Selalu Gunakan Harga Real Accurate (base_price)</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-1.5">
-                    Kolom <code>custom_sell_price</code> dikelola via Import Excel/CSV dan kebal terhadap sinkronisasi Accurate. Pilih <code>Hanya Custom Sell Price</code> jika ingin menyembunyikan produk berharga placeholder Accurate (misal <code>Rp 1</code>) yang belum diisi di Excel.
-                </p>
-                @error('tradeinSecondPriceSource') <span class="text-rose-500 text-xs font-semibold mt-1 block">{{ $message }}</span> @enderror
+            {{-- Sumber Harga Jual BU Second & Up Harga Jual Trade-In Accurate --}}
+            <div class="p-4 rounded-xl border border-blue-200/80 bg-blue-50/40 space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-1.5">Sumber Harga Jual Unit Bisnis Second (BU 2)</label>
+                    <select wire:model.live="tradeinSecondPriceSource"
+                        class="w-full text-sm rounded-lg border-gray-300 px-4 py-3 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4] transition-all bg-white">
+                        <option value="custom_fallback">Utamakan Custom Sell Price (Excel), Fallback ke Harga Accurate [Rekomendasi]</option>
+                        <option value="custom_only">Hanya Custom Sell Price (Excel) — Sembunyikan produk yang belum diatur di Excel</option>
+                        <option value="accurate_only">Selalu Gunakan Harga Real Accurate (base_price)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1.5">
+                        Kolom <code>custom_sell_price</code> dikelola via Import Excel/CSV dan kebal terhadap sinkronisasi Accurate. Pilih <code>Hanya Custom Sell Price</code> jika ingin menyembunyikan produk berharga placeholder Accurate (misal <code>Rp 1</code>) yang belum diisi di Excel.
+                    </p>
+                    @error('tradeinSecondPriceSource') <span class="text-rose-500 text-xs font-semibold mt-1 block">{{ $message }}</span> @enderror
+                </div>
+
+                {{-- Up Harga Jual Trade-In Accurate (%) --}}
+                @php
+                    $simMarkup = max(0, (float) ($tradeinSecondAccurateMarkupPercent ?: 0));
+                    $simRounding = max(0, (int) ($tradeinSecondAccurateRounding ?: 0));
+                    $simSampleBase = 5000000;
+                    $simResult = round($simSampleBase * (1 + ($simMarkup / 100)));
+                    if ($simMarkup > 0 && $simRounding > 0) {
+                        $simResult = ceil($simResult / $simRounding) * $simRounding;
+                    }
+                @endphp
+                <div class="bg-white p-4 rounded-xl border border-blue-200/70 space-y-3 {{ $tradeinSecondPriceSource === 'custom_only' ? 'opacity-60' : '' }}">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-800">
+                                Up Harga Jual Trade-In Accurate (%)
+                            </label>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                Persentase kenaikan otomatis <strong>khusus saat harga diambil dari Accurate (<code>base_price</code>)</strong> karena harga Accurate diset harga terendah. Produk yang sudah memiliki <code>custom_sell_price</code> <strong>tidak ikut di-up</strong>.
+                            </p>
+                        </div>
+                        @if ($tradeinSecondPriceSource === 'custom_only')
+                            <span class="text-[11px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full shrink-0">
+                                Nonaktif pada mode Custom Only
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Persentase Up Harga (%)</label>
+                            <div class="relative">
+                                <input type="number" step="0.5" min="0" max="200"
+                                    wire:model.live="tradeinSecondAccurateMarkupPercent"
+                                    class="w-full text-sm font-bold rounded-lg border-gray-300 px-3.5 py-2.5 pr-10 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4]"
+                                    placeholder="0">
+                                <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">%</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400 mt-1">Isi <code>0</code> jika tidak ingin menaikkan harga Accurate. Contoh: <code>10</code> berarti harga Accurate × 110%.</p>
+                            @error('tradeinSecondAccurateMarkupPercent') <span class="text-rose-500 text-xs font-semibold mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Pembulatan Harga Setelah Up</label>
+                            <select wire:model.live="tradeinSecondAccurateRounding"
+                                class="w-full text-sm rounded-lg border-gray-300 px-3.5 py-2.5 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4] bg-white">
+                                <option value="0">Tanpa Pembulatan Kelipatan (Persis)</option>
+                                <option value="1000">Bulatkan ke atas per Rp 1.000</option>
+                                <option value="10000">Bulatkan ke atas per Rp 10.000</option>
+                                <option value="50000">Bulatkan ke atas per Rp 50.000</option>
+                                <option value="100000">Bulatkan ke atas per Rp 100.000</option>
+                            </select>
+                            <p class="text-[11px] text-gray-400 mt-1">Agar hasil persentase tetap rapi (misal <code>Rp 5.500.000</code> bukan angka ganjil).</p>
+                            @error('tradeinSecondAccurateRounding') <span class="text-rose-500 text-xs font-semibold mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    {{-- Simulasi Langsung --}}
+                    <div class="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <span class="text-gray-600">
+                            Simulasi Harga Accurate <strong>Rp {{ number_format($simSampleBase, 0, ',', '.') }}</strong>
+                            @if ($simMarkup > 0)
+                                + Up <strong class="text-[#1c69d4]">{{ rtrim(rtrim(number_format($simMarkup, 2, '.', ''), '0'), '.') }}%</strong>
+                            @else
+                                (Tanpa Up)
+                            @endif
+                        </span>
+                        <span class="font-extrabold text-[#1c69d4] text-sm">
+                            → Rp {{ number_format($simResult, 0, ',', '.') }}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {{-- Strategi Harga Grup Warna --}}

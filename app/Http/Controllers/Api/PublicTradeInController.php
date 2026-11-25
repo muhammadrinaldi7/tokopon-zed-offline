@@ -254,6 +254,8 @@ class PublicTradeInController extends Controller
             : (bool) $this->settingService->get('tradein_group_target_devices', true);
 
         $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $accurateMarkupPercent = max(0.0, (float) $this->settingService->get('tradein_second_accurate_markup_percent', 0));
+        $accurateRounding = max(0, (int) $this->settingService->get('tradein_second_accurate_rounding', 0));
         $allowedProyeks = $this->resolveAllowedProyeks(
             $targetType === 'second'
                 ? 'tradein_target_second_allowed_proyeks'
@@ -313,17 +315,26 @@ class PublicTradeInController extends Controller
 
         if ($isGrouped) {
             $devices = $rawDevices
-                ->map(function (ProductAccurate $device) use ($secondPriceSource) {
-                    $effectivePrice = $device->getEffectiveTradeInSellPrice($secondPriceSource);
+                ->map(function (ProductAccurate $device) use ($secondPriceSource, $accurateMarkupPercent, $accurateRounding) {
+                    $effectivePrice = $device->getEffectiveTradeInSellPrice(
+                        $secondPriceSource,
+                        $accurateMarkupPercent,
+                        $accurateRounding
+                    );
                     $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
                     $isUsingCustom = ($device->business_unit_id == 2)
                         && $secondPriceSource !== 'accurate_only'
                         && (($device->custom_sell_price ?? 0) > 0);
+                    $isUsingMarkedUpAccurate = ($device->business_unit_id == 2)
+                        && !$isUsingCustom
+                        && $accurateMarkupPercent > 0;
 
                     return [
                         'model_instance' => $device,
                         'effective_price' => $effectivePrice,
-                        'price_source' => $isUsingCustom ? 'custom' : 'accurate',
+                        'price_source' => $isUsingCustom
+                            ? 'custom'
+                            : ($isUsingMarkedUpAccurate ? 'accurate_markup' : 'accurate'),
                         'attrs' => $attrs,
                     ];
                 })
@@ -373,13 +384,20 @@ class PublicTradeInController extends Controller
                 })
                 ->values();
         } else {
-            $devices = $rawDevices->map(function (ProductAccurate $device) use ($targetType, $secondPriceSource) {
-                $effectivePrice = $device->getEffectiveTradeInSellPrice($secondPriceSource);
+            $devices = $rawDevices->map(function (ProductAccurate $device) use ($targetType, $secondPriceSource, $accurateMarkupPercent, $accurateRounding) {
+                $effectivePrice = $device->getEffectiveTradeInSellPrice(
+                    $secondPriceSource,
+                    $accurateMarkupPercent,
+                    $accurateRounding
+                );
                 $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
                 $cleanName = (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
                 $isUsingCustom = ($device->business_unit_id == 2)
                     && $secondPriceSource !== 'accurate_only'
                     && (($device->custom_sell_price ?? 0) > 0);
+                $isUsingMarkedUpAccurate = ($device->business_unit_id == 2)
+                    && !$isUsingCustom
+                    && $accurateMarkupPercent > 0;
 
                 return [
                     'id' => $device->id,
@@ -395,7 +413,9 @@ class PublicTradeInController extends Controller
                     'condition_label' => $targetType === 'second' ? 'Second / Bekas' : 'Baru / Segel',
                     'variant_count' => 1,
                     'available_colors' => $attrs['color'] ? [$attrs['color']] : [],
-                    'price_source' => $isUsingCustom ? 'custom' : 'accurate',
+                    'price_source' => $isUsingCustom
+                        ? 'custom'
+                        : ($isUsingMarkedUpAccurate ? 'accurate_markup' : 'accurate'),
                     'base_price' => $effectivePrice,
                     'formatted_base_price' => 'Rp ' . number_format($effectivePrice, 0, ',', '.'),
                 ];
@@ -408,6 +428,8 @@ class PublicTradeInController extends Controller
             'grouped' => $isGrouped,
             'allowed_proyeks' => $allowedProyeks,
             'price_source_mode' => $targetType === 'second' ? $secondPriceSource : 'accurate_only',
+            'accurate_markup_percent' => $targetType === 'second' ? $accurateMarkupPercent : 0,
+            'accurate_rounding' => $targetType === 'second' ? $accurateRounding : 0,
             'total' => $devices->count(),
             'data' => $devices,
         ]);
@@ -431,11 +453,17 @@ class PublicTradeInController extends Controller
         $targetDevice = ProductAccurate::findOrFail($request->input('target_device_id'));
 
         $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $accurateMarkupPercent = max(0.0, (float) $this->settingService->get('tradein_second_accurate_markup_percent', 0));
+        $accurateRounding = max(0, (int) $this->settingService->get('tradein_second_accurate_rounding', 0));
         $groupOld = (bool) $this->settingService->get('tradein_group_old_devices', true);
         $groupTarget = (bool) $this->settingService->get('tradein_group_target_devices', true);
 
         $oldPrice = (float) ($oldDevice->buy_price > 0 ? $oldDevice->buy_price : ($oldDevice->base_price ?? 0));
-        $targetPrice = $targetDevice->getEffectiveTradeInSellPrice($secondPriceSource);
+        $targetPrice = $targetDevice->getEffectiveTradeInSellPrice(
+            $secondPriceSource,
+            $accurateMarkupPercent,
+            $accurateRounding
+        );
         $difference = max(0, $targetPrice - $oldPrice);
 
         $oldAttrs = ProductAccurate::parseTradeInAttributes($oldDevice->name, $oldDevice->proyek, $oldDevice->business_unit_id);
