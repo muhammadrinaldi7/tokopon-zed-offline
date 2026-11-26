@@ -225,6 +225,7 @@
                                                     : (!empty($fallbackItemSns) ? implode(', ', $fallbackItemSns) : '');
 
                                                 $bundleEntries = [];
+                                                $mainEntries = [];
                                                 if ($promo->is_bundle && !$isCurrentBundleItem && !empty($promoBundleSkus)) {
                                                     foreach ($order->items as $bItem) {
                                                         $bVariant = $bItem->variant;
@@ -251,6 +252,36 @@
                                                         }
                                                         $bundleEntries[] = $bEntryText;
                                                     }
+                                                } elseif ($promo->is_bundle && $isCurrentBundleItem) {
+                                                    $promoMainSkus = $promo->skus->pluck('sku')->filter()->map(fn($s) => trim((string) $s))->unique()->values()->all();
+                                                    foreach ($order->items as $mItem) {
+                                                        $mVariant = $mItem->variant;
+                                                        $mSku = trim((string) ($mVariant?->item_no ?? ''));
+                                                        if ($mSku !== '' && in_array($mSku, $promoBundleSkus, true)) {
+                                                            continue;
+                                                        }
+                                                        if (!$promo->apply_to_all_items && ($mSku === '' || !in_array($mSku, $promoMainSkus, true))) {
+                                                            continue;
+                                                        }
+                                                        $mName = $mVariant?->name ?? ($mItem->product_name ?? 'Unknown');
+                                                        $mSns = $mItem->promos
+                                                            ->where('id', $promo->id)
+                                                            ->pluck('pivot.serial_number')
+                                                            ->filter()
+                                                            ->values()
+                                                            ->all();
+                                                        if (empty($mSns)) {
+                                                            $mSns = $mItem->serialNumbers->pluck('serial_number')->filter()->values()->all();
+                                                        }
+                                                        if (empty($mSns) && !empty($mItem->serial_number)) {
+                                                            $mSns = array_values(array_filter(array_map('trim', explode(',', $mItem->serial_number))));
+                                                        }
+                                                        $mEntryText = $mName . ' x' . $mItem->qty;
+                                                        if (!empty($mSns)) {
+                                                            $mEntryText .= ' [SN: ' . implode(', ', array_unique($mSns)) . ']';
+                                                        }
+                                                        $mainEntries[] = $mEntryText;
+                                                    }
                                                 }
                                             @endphp
                                             <div
@@ -264,6 +295,11 @@
                                                 @if (!empty($bundleEntries))
                                                     <div class="text-xs text-amber-700 font-normal mt-0.5">
                                                         Bundling: {{ implode('; ', $bundleEntries) }}
+                                                    </div>
+                                                @endif
+                                                @if (!empty($mainEntries))
+                                                    <div class="text-xs text-blue-700 font-normal mt-0.5">
+                                                        Produk Utama: {{ implode('; ', $mainEntries) }}
                                                     </div>
                                                 @endif
                                             </div>

@@ -278,11 +278,15 @@ class PromoReportTest extends TestCase
         $this->assertCount(2, $bundleOrderRows);
         $this->assertEquals('Produk Utama', $bundleOrderRows[0]['tipe_item']);
         $this->assertEquals('356789012345678', $bundleOrderRows[0]['sn']);
+        $this->assertEquals('-', $bundleOrderRows[0]['produk_utama']);
+        $this->assertEquals('-', $bundleOrderRows[0]['sn_produk_utama']);
         $this->assertEquals('Anker Soundcore TWS (x1); Clear Case (x1)', $bundleOrderRows[0]['item_bundling']);
         $this->assertEquals('SN-ANKER-998877', $bundleOrderRows[0]['sn_bundling']);
 
         $this->assertEquals('Item Bundling', $bundleOrderRows[1]['tipe_item']);
         $this->assertEquals('-', $bundleOrderRows[1]['sn']);
+        $this->assertEquals('Samsung Galaxy S25 (x1)', $bundleOrderRows[1]['produk_utama']);
+        $this->assertEquals('356789012345678', $bundleOrderRows[1]['sn_produk_utama']);
         $this->assertEquals('-', $bundleOrderRows[1]['item_bundling']);
         $this->assertEquals('-', $bundleOrderRows[1]['sn_bundling']);
 
@@ -310,18 +314,112 @@ class PromoReportTest extends TestCase
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($f);
             $sheet = $spreadsheet->getActiveSheet();
             $this->assertEquals('TIPE ITEM', $sheet->getCell('I1')->getValue());
-            $this->assertEquals('ITEM BUNDLING', $sheet->getCell('L1')->getValue());
-            $this->assertEquals('SN BUNDLING', $sheet->getCell('M1')->getValue());
+            $this->assertEquals('PRODUK UTAMA', $sheet->getCell('L1')->getValue());
+            $this->assertEquals('SN PRODUK UTAMA', $sheet->getCell('M1')->getValue());
+            $this->assertEquals('ITEM BUNDLING', $sheet->getCell('N1')->getValue());
+            $this->assertEquals('SN BUNDLING', $sheet->getCell('O1')->getValue());
             $this->assertEquals('Produk Utama', $sheet->getCell('I2')->getValue());
             $this->assertSame('356789012345678', $sheet->getCell('K2')->getValue());
             $this->assertEquals(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $sheet->getCell('K2')->getDataType());
-            $this->assertEquals('Anker Soundcore TWS (x1); Clear Case (x1)', $sheet->getCell('L2')->getValue());
-            $this->assertSame('SN-ANKER-998877', $sheet->getCell('M2')->getValue());
-            $this->assertEquals(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $sheet->getCell('M2')->getDataType());
-            $this->assertEquals(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC, $sheet->getCell('O2')->getDataType());
-            $this->assertEquals(500000, $sheet->getCell('O2')->getValue());
+            $this->assertEquals('-', $sheet->getCell('L2')->getValue());
+            $this->assertEquals('-', $sheet->getCell('M2')->getValue());
+            $this->assertEquals('Anker Soundcore TWS (x1); Clear Case (x1)', $sheet->getCell('N2')->getValue());
+            $this->assertSame('SN-ANKER-998877', $sheet->getCell('O2')->getValue());
+            $this->assertEquals(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $sheet->getCell('O2')->getDataType());
+            $this->assertEquals(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC, $sheet->getCell('Q2')->getDataType());
+            $this->assertEquals(500000, $sheet->getCell('Q2')->getValue());
         } finally {
             @unlink($tmpFile);
         }
+    }
+
+    public function test_promo_report_includes_main_product_and_multiple_sns_when_discount_is_on_bundle_item_only()
+    {
+        $mainProduct = ProductAccurate::create([
+            'item_no' => '100384',
+            'name' => 'HP IPHONE 18 PRO MAX - 256GB - BURGUNDY',
+            'accurate_id' => 'ACC-IPH-18',
+            'brandName' => 'APPLE',
+            'has_sn' => true,
+        ]);
+
+        $bundleAdapter = ProductAccurate::create([
+            'item_no' => 'SFNT0397P6EZPLX2A102',
+            'name' => 'ADAPTER - APPLE - POWER ADAPTER 20W USB-C (SN) - WHITE',
+            'accurate_id' => 'ACC-ADP-20W',
+            'brandName' => 'APPLE',
+            'has_sn' => true,
+        ]);
+
+        $promo = Promo::create([
+            'name' => 'Free adapter original (TAM) OKT 26',
+            'code' => 'FREEADP26',
+            'discount_type' => 'fixed',
+            'discount_value' => 0,
+            'is_bundle' => true,
+            'bundle_discount_type' => 'fixed',
+            'bundle_discount_value' => 310000,
+        ]);
+        $promo->skus()->create(['sku' => '100384']);
+        $promo->bundleSkus()->create(['sku' => 'SFNT0397P6EZPLX2A102']);
+
+        $order = Order::create([
+            'order_number' => 'ORD-GWP-2HP',
+            'accurate_invoice_no' => 'INV-GWP-2HP',
+            'business_unit_id' => $this->bu->id,
+            'user_id' => $this->user->id,
+            'order_status' => 'COMPLETED',
+            'total_amount' => 59497000,
+            'grand_total' => 58998000,
+            'shipping_address_snapshot' => ['store' => 'Cabang Test'],
+        ]);
+        $order->promos()->attach($promo->id, ['discount_applied' => 310000]);
+
+        // 2 unit iPhone 18 dengan discount_value = 0 (tidak tercatat di order_item_promos)
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'HP IPHONE 18 PRO MAX - 256GB - BURGUNDY',
+            'qty' => 2,
+            'price_at_checkout' => 29499000,
+            'subtotal' => 58998000,
+            'serial_number' => '358687536538210, 358687537763734',
+            'product_variant_type' => ProductAccurate::class,
+            'product_variant_id' => $mainProduct->id,
+        ]);
+
+        // 1 unit Adapter bundling yang memegang discount_amount = 310000
+        $bundleItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'ADAPTER - APPLE - POWER ADAPTER 20W USB-C (SN) - WHITE',
+            'qty' => 1,
+            'price_at_checkout' => 499000,
+            'subtotal' => 499000,
+            'promo_discount_amount' => 310000,
+            'serial_number' => 'SC4H605622NMPK84BG',
+            'product_variant_type' => ProductAccurate::class,
+            'product_variant_id' => $bundleAdapter->id,
+        ]);
+        $bundleItem->promos()->attach($promo->id, [
+            'discount_amount' => 310000,
+            'serial_number' => 'SC4H605622NMPK84BG',
+            'vendor_name' => 'PT. TELETAMA ARTHA MANDIRI (IPHONE)',
+        ]);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(PromoReport::class)
+            ->set('brandFilter', 'APPLE');
+
+        $getClaimRows = new \ReflectionMethod(PromoReport::class, 'getClaimRows');
+        $getClaimRows->setAccessible(true);
+        $rows = collect($getClaimRows->invoke($component->instance()))->where('order_no', 'ORD-GWP-2HP')->values();
+
+        $this->assertCount(1, $rows);
+        $this->assertEquals('Item Bundling', $rows[0]['tipe_item']);
+        $this->assertEquals('SC4H605622NMPK84BG', $rows[0]['sn']);
+        $this->assertEquals('HP IPHONE 18 PRO MAX - 256GB - BURGUNDY (x2)', $rows[0]['produk_utama']);
+        $this->assertEquals('358687536538210, 358687537763734', $rows[0]['sn_produk_utama']);
+        $this->assertEquals('-', $rows[0]['item_bundling']);
+        $this->assertEquals('-', $rows[0]['sn_bundling']);
+        $this->assertEquals(310000.0, $rows[0]['nilai_klaim']);
     }
 }

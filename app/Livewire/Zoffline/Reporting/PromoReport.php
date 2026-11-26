@@ -223,7 +223,7 @@ class PromoReport extends Component
     }
 
     /**
-     * Kumpulkan ringkasan item bundling dan SN bundling untuk satu kombinasi Order + Promo.
+     * Kumpulkan ringkasan produk utama dan item bundling (beserta SN masing-masing) untuk satu kombinasi Order + Promo.
      */
     private function getOrderPromoBundleContext(Order $order, Promo $promo): array
     {
@@ -232,6 +232,10 @@ class PromoReport extends Component
                 'bundle_skus' => [],
                 'bundle_items_text' => '-',
                 'bundle_sns' => [],
+                'main_skus' => [],
+                'main_items_text' => '-',
+                'main_sns' => [],
+                'main_brands' => [],
             ];
         }
 
@@ -243,27 +247,43 @@ class PromoReport extends Component
             ->values()
             ->all();
 
-        if (empty($bundleSkus)) {
-            return [
-                'bundle_skus' => [],
-                'bundle_items_text' => '-',
-                'bundle_sns' => [],
-            ];
-        }
+        $mainSkus = $promo->skus
+            ->pluck('sku')
+            ->map(fn($sku) => trim((string) $sku))
+            ->filter(fn($sku) => $sku !== '')
+            ->unique()
+            ->values()
+            ->all();
 
         $bundleLabels = [];
         $bundleSns = [];
+        $mainLabels = [];
+        $mainSns = [];
+        $mainBrands = [];
 
         foreach ($order->items as $candidateItem) {
             $candidateSku = $this->resolveItemSku($candidateItem);
-            if ($candidateSku === '' || !in_array($candidateSku, $bundleSkus, true)) {
+            $isBundleCandidate = $candidateSku !== '' && in_array($candidateSku, $bundleSkus, true);
+
+            if ($isBundleCandidate) {
+                $bundleLabels[] = $this->resolveItemName($candidateItem) . ' (x' . $candidateItem->qty . ')';
+
+                foreach ($this->resolveItemSerialNumbers($candidateItem, $promo->id) as $sn) {
+                    $bundleSns[] = $sn;
+                }
                 continue;
             }
 
-            $bundleLabels[] = $this->resolveItemName($candidateItem) . ' (x' . $candidateItem->qty . ')';
+            $isMainCandidate = $promo->apply_to_all_items
+                || ($candidateSku !== '' && in_array($candidateSku, $mainSkus, true));
 
-            foreach ($this->resolveItemSerialNumbers($candidateItem, $promo->id) as $sn) {
-                $bundleSns[] = $sn;
+            if ($isMainCandidate) {
+                $mainLabels[] = $this->resolveItemName($candidateItem) . ' (x' . $candidateItem->qty . ')';
+                $mainBrands[] = $this->resolveItemBrand($candidateItem);
+
+                foreach ($this->resolveItemSerialNumbers($candidateItem, $promo->id) as $sn) {
+                    $mainSns[] = $sn;
+                }
             }
         }
 
@@ -271,6 +291,10 @@ class PromoReport extends Component
             'bundle_skus' => $bundleSkus,
             'bundle_items_text' => !empty($bundleLabels) ? implode('; ', $bundleLabels) : '-',
             'bundle_sns' => array_values(array_unique($bundleSns)),
+            'main_skus' => $mainSkus,
+            'main_items_text' => !empty($mainLabels) ? implode('; ', $mainLabels) : '-',
+            'main_sns' => array_values(array_unique($mainSns)),
+            'main_brands' => array_values(array_unique($mainBrands)),
         ];
     }
 
@@ -293,6 +317,7 @@ class PromoReport extends Component
 
             $bundleContextCache = [];
             $mainRowTotalsByPromo = [];
+            $bundleRowTotalsByPromo = [];
 
             foreach ($order->items as $item) {
                 $itemSku = $this->resolveItemSku($item);
@@ -307,13 +332,16 @@ class PromoReport extends Component
                         && $itemSku !== ''
                         && in_array($itemSku, $bundleContextCache[$promo->id]['bundle_skus'], true);
 
-                    if (!$isBundleItem) {
+                    if ($isBundleItem) {
+                        $bundleRowTotalsByPromo[$promo->id] = ($bundleRowTotalsByPromo[$promo->id] ?? 0) + 1;
+                    } else {
                         $mainRowTotalsByPromo[$promo->id] = ($mainRowTotalsByPromo[$promo->id] ?? 0) + 1;
                     }
                 }
             }
 
             $mainRowIndexByPromo = [];
+            $bundleRowIndexByPromo = [];
 
             foreach ($order->items as $item) {
                 $name = $this->resolveItemName($item);
@@ -340,16 +368,28 @@ class PromoReport extends Component
                         && in_array($itemSku, $bundleContext['bundle_skus'], true);
 
                     $mainRowIdx = null;
-                    if (!$isBundleItem) {
+                    $bundleRowIdx = null;
+                    if ($isBundleItem) {
+                        $bundleRowIdx = $bundleRowIndexByPromo[$promo->id] ?? 0;
+                        $bundleRowIndexByPromo[$promo->id] = $bundleRowIdx + 1;
+                    } else {
                         $mainRowIdx = $mainRowIndexByPromo[$promo->id] ?? 0;
                         $mainRowIndexByPromo[$promo->id] = $mainRowIdx + 1;
                     }
 
-                    if ($this->brandFilter && $merk !== $this->brandFilter) {
+                    $matchesBrand = !$this->brandFilter
+                        || $merk === $this->brandFilter
+                        || ($isBundleItem
+                            && ($mainRowTotalsByPromo[$promo->id] ?? 0) === 0
+                            && in_array($this->brandFilter, $bundleContext['main_brands'], true));
+
+                    if (!$matchesBrand) {
                         continue;
                     }
 
                     $tipeItem = $isBundleItem ? 'Item Bundling' : 'Produk Utama';
+                    $produkUtama = '-';
+                    $snProdukUtama = '-';
                     $itemBundling = '-';
                     $snBundling = '-';
 
@@ -363,6 +403,18 @@ class PromoReport extends Component
                                 $snBundling = $bundleSns[$mainRowIdx];
                             } else {
                                 $snBundling = implode(', ', $bundleSns);
+                            }
+                        }
+                    } elseif ($isBundleItem && $promo->is_bundle) {
+                        $produkUtama = $bundleContext['main_items_text'];
+                        $mainSns = $bundleContext['main_sns'];
+                        $bundleRowsCount = $bundleRowTotalsByPromo[$promo->id] ?? 1;
+
+                        if (!empty($mainSns)) {
+                            if ($bundleRowsCount > 1 && count($mainSns) === $bundleRowsCount && isset($mainSns[$bundleRowIdx])) {
+                                $snProdukUtama = $mainSns[$bundleRowIdx];
+                            } else {
+                                $snProdukUtama = implode(', ', $mainSns);
                             }
                         }
                     }
@@ -379,6 +431,8 @@ class PromoReport extends Component
                         'tipe_item' => $tipeItem,
                         'nama_produk' => $name,
                         'sn' => $sn,
+                        'produk_utama' => $produkUtama,
+                        'sn_produk_utama' => $snProdukUtama,
                         'item_bundling' => $itemBundling,
                         'sn_bundling' => $snBundling,
                         'nama_promo' => $promoName,
@@ -430,6 +484,8 @@ class PromoReport extends Component
                 'TIPE ITEM',
                 'NAMA PRODUK',
                 'SN',
+                'PRODUK UTAMA',
+                'SN PRODUK UTAMA',
                 'ITEM BUNDLING',
                 'SN BUNDLING',
                 'NAMA PROMO',

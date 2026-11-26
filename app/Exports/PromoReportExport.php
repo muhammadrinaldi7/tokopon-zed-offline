@@ -63,6 +63,8 @@ class PromoReportExport extends StringValueBinder implements FromArray, WithHead
             'TIPE ITEM',
             'NAMA PRODUK',
             'SN',
+            'PRODUK UTAMA',
+            'SN PRODUK UTAMA',
             'ITEM BUNDLING',
             'SN BUNDLING',
             'NAMA PROMO',
@@ -75,7 +77,8 @@ class PromoReportExport extends StringValueBinder implements FromArray, WithHead
         return [
             'K' => NumberFormat::FORMAT_TEXT,
             'M' => NumberFormat::FORMAT_TEXT,
-            'O' => '#,##0',
+            'O' => NumberFormat::FORMAT_TEXT,
+            'Q' => '#,##0',
         ];
     }
 
