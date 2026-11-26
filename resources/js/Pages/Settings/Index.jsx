@@ -33,6 +33,7 @@ export default function EcommerceSettingsIndex({
     referralSettings = {},
     tradeInSettings = {},
     availableProyeks = ['INTER', 'NON-PROYEK', 'RESMI'],
+    availableTradeInBrands = [{ name: 'APPLE', count: 0 }],
     selectedBuId = null,
     buSettings = {},
     warehouses = [],
@@ -47,6 +48,9 @@ export default function EcommerceSettingsIndex({
     const proyekOptions = Array.isArray(availableProyeks)
         ? availableProyeks
         : Object.values(availableProyeks || {});
+    const tradeInBrandOptions = Array.isArray(availableTradeInBrands)
+        ? availableTradeInBrands
+        : Object.values(availableTradeInBrands || {});
     const warehouseList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses || {});
     const employeeList = Array.isArray(employees) ? employees : Object.values(employees || {});
     const userList = Array.isArray(users) ? users : Object.values(users || {});
@@ -121,6 +125,15 @@ export default function EcommerceSettingsIndex({
             : [],
         tradein_target_second_allowed_proyeks: Array.isArray(tradeInSettings?.tradein_target_second_allowed_proyeks)
             ? tradeInSettings.tradein_target_second_allowed_proyeks
+            : [],
+        tradein_old_allowed_brands: Array.isArray(tradeInSettings?.tradein_old_allowed_brands)
+            ? tradeInSettings.tradein_old_allowed_brands
+            : [],
+        tradein_target_second_allowed_brands: Array.isArray(tradeInSettings?.tradein_target_second_allowed_brands)
+            ? tradeInSettings.tradein_target_second_allowed_brands
+            : ['APPLE'],
+        tradein_target_new_allowed_brands: Array.isArray(tradeInSettings?.tradein_target_new_allowed_brands)
+            ? tradeInSettings.tradein_target_new_allowed_brands
             : [],
         tradein_group_old_devices: tradeInSettings?.tradein_group_old_devices ?? true,
         tradein_group_target_devices: tradeInSettings?.tradein_group_target_devices ?? true,
@@ -1420,6 +1433,75 @@ export default function EcommerceSettingsIndex({
                                                             }`}
                                                         >
                                                             {pr}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Section 3.5: Filter Brand Trade-In Dinamis */}
+                            <div className="p-4 sm:p-5 rounded-2xl border border-sky-200/80 bg-sky-50/30 space-y-3">
+                                <div>
+                                    <h3 className="text-xs font-black text-slate-800">
+                                        Filter Brand yang Ditampilkan di API Trade-In
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        Aktifkan brand tertentu (misal APPLE &amp; SAMSUNG untuk HP Second). Kosongkan pilihan jika ingin menampilkan semua brand yang memiliki harga.
+                                    </p>
+                                </div>
+
+                                {[
+                                    { key: 'tradein_target_second_allowed_brands', label: '1. Brand HP Tujuan Second (type=second & target_type=second)' },
+                                    { key: 'tradein_old_allowed_brands', label: '2. Brand HP Lama Customer (type=old & /old-devices)' },
+                                    { key: 'tradein_target_new_allowed_brands', label: '3. Brand HP Tujuan Baru (type=new & target_type=new)' },
+                                ].map((group) => {
+                                    const selectedList = tradeInForm[group.key] || [];
+                                    return (
+                                        <div key={group.key} className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-[11px] font-bold text-slate-700">{group.label}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    {selectedList.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setTradeInForm((prev) => ({ ...prev, [group.key]: [] }))
+                                                            }
+                                                            className="text-[10px] font-bold text-rose-600 hover:underline"
+                                                        >
+                                                            Reset (Semua)
+                                                        </button>
+                                                    )}
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
+                                                        {selectedList.length > 0 ? `${selectedList.length} Brand Dipilih` : 'Semua Brand'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {tradeInBrandOptions.map((br) => {
+                                                    const brandName = typeof br === 'string' ? br : br.name;
+                                                    const brandCount = typeof br === 'object' ? br.count : null;
+                                                    const isOn = selectedList.includes(brandName);
+                                                    return (
+                                                        <button
+                                                            key={brandName}
+                                                            type="button"
+                                                            onClick={() => toggleTradeInProyek(group.key, brandName)}
+                                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                                                                isOn
+                                                                    ? 'bg-sky-600 text-white border-sky-600'
+                                                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-sky-300'
+                                                            }`}
+                                                        >
+                                                            {brandName}
+                                                            {brandCount !== null && (
+                                                                <span className={`ml-1 text-[10px] ${isOn ? 'text-sky-100' : 'text-slate-400'}`}>
+                                                                    ({brandCount})
+                                                                </span>
+                                                            )}
                                                         </button>
                                                     );
                                                 })}

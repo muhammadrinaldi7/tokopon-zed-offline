@@ -156,6 +156,75 @@
                 </div>
             </div>
 
+            {{-- Filter Brand yang Ditampilkan di API Trade-In --}}
+            <div class="p-4 rounded-xl border border-sky-200/80 bg-sky-50/40 space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800">
+                        Filter Brand yang Ditampilkan di API Trade-In
+                    </label>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        Atur secara dinamis brand apa saja yang tampil pada fitur Trade-In (contoh: aktifkan <code>APPLE</code> &amp; <code>SAMSUNG</code> untuk HP Second). <strong>Kosongkan centang jika ingin menampilkan semua brand yang memiliki harga.</strong>
+                    </p>
+                </div>
+
+                {{-- 1. Brand HP Tujuan Second --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">1. Brand HP Tujuan Second (<code>type=second</code> &amp; <code>target_type=second</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinTargetSecondAllowedBrands) > 0 ? 'text-sky-700 bg-sky-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinTargetSecondAllowedBrands) > 0 ? count($tradeinTargetSecondAllowedBrands) . ' Brand Dipilih' : 'Semua Brand' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableBrands as $brandItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-sky-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinTargetSecondAllowedBrands" value="{{ $brandItem['name'] }}"
+                                    class="rounded border-gray-300 text-sky-600 focus:ring-sky-600">
+                                <span>{{ $brandItem['name'] }} <span class="text-[10px] font-normal text-gray-400">({{ $brandItem['count'] }})</span></span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- 2. Brand HP Lama --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">2. Brand HP Lama Customer (<code>type=old</code> &amp; <code>/old-devices</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinOldAllowedBrands) > 0 ? 'text-sky-700 bg-sky-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinOldAllowedBrands) > 0 ? count($tradeinOldAllowedBrands) . ' Brand Dipilih' : 'Semua Brand' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableBrands as $brandItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-sky-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinOldAllowedBrands" value="{{ $brandItem['name'] }}"
+                                    class="rounded border-gray-300 text-sky-600 focus:ring-sky-600">
+                                <span>{{ $brandItem['name'] }} <span class="text-[10px] font-normal text-gray-400">({{ $brandItem['count'] }})</span></span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- 3. Brand HP Tujuan Baru --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">3. Brand HP Tujuan Baru (<code>type=new</code> &amp; <code>target_type=new</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinTargetNewAllowedBrands) > 0 ? 'text-sky-700 bg-sky-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinTargetNewAllowedBrands) > 0 ? count($tradeinTargetNewAllowedBrands) . ' Brand Dipilih' : 'Semua Brand' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableBrands as $brandItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-sky-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinTargetNewAllowedBrands" value="{{ $brandItem['name'] }}"
+                                    class="rounded border-gray-300 text-sky-600 focus:ring-sky-600">
+                                <span>{{ $brandItem['name'] }} <span class="text-[10px] font-normal text-gray-400">({{ $brandItem['count'] }})</span></span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
             {{-- Toggle Grouping --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 hover:border-[#1c69d4]/40 bg-gray-50/50 cursor-pointer transition">

@@ -93,6 +93,9 @@ class EcommerceSettingsController extends Controller
                     'tradein_old_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_old_allowed_proyeks', [])),
                     'tradein_target_new_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_target_new_allowed_proyeks', [])),
                     'tradein_target_second_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_target_second_allowed_proyeks', [])),
+                    'tradein_old_allowed_brands' => $normalizeProyek($settingService->get('tradein_old_allowed_brands', [])),
+                    'tradein_target_second_allowed_brands' => $normalizeProyek($settingService->get('tradein_target_second_allowed_brands', ['APPLE'])),
+                    'tradein_target_new_allowed_brands' => $normalizeProyek($settingService->get('tradein_target_new_allowed_brands', [])),
                     'tradein_group_old_devices' => filter_var($settingService->get('tradein_group_old_devices', true), FILTER_VALIDATE_BOOLEAN),
                     'tradein_group_target_devices' => filter_var($settingService->get('tradein_group_target_devices', true), FILTER_VALIDATE_BOOLEAN),
                     'tradein_second_price_source' => (string) $settingService->get('tradein_second_price_source', 'custom_fallback'),
@@ -124,6 +127,9 @@ class EcommerceSettingsController extends Controller
                     'tradein_old_allowed_proyeks' => [],
                     'tradein_target_new_allowed_proyeks' => [],
                     'tradein_target_second_allowed_proyeks' => [],
+                    'tradein_old_allowed_brands' => [],
+                    'tradein_target_second_allowed_brands' => ['APPLE'],
+                    'tradein_target_new_allowed_brands' => [],
                     'tradein_group_old_devices' => true,
                     'tradein_group_target_devices' => true,
                     'tradein_second_price_source' => 'custom_fallback',
@@ -366,11 +372,66 @@ class EcommerceSettingsController extends Controller
                 \Illuminate\Support\Facades\Log::warning('Settings: Failed to load proyeks: ' . $e->getMessage());
             }
 
+            // 6.1 Daftar Brand unik kategori Smartphone/HP untuk Filter Brand API Trade-In
+            $availableTradeInBrands = [['name' => 'APPLE', 'count' => 0]];
+            try {
+                if (Schema::hasTable('product_accurates') && Schema::hasColumn('product_accurates', 'brandName')) {
+                    $brandRows = ProductAccurate::query()
+                        ->whereNotNull('brandName')
+                        ->where('brandName', '!=', '')
+                        ->where(function ($q) {
+                            $q->where('categoryName', 'like', '%Handphone%')
+                                ->orWhere('categoryName', 'like', '%HP SECOND%')
+                                ->orWhere('categoryName', 'like', '%HP NEW%')
+                                ->orWhere('name', 'like', '%HP 2ND%');
+                        })
+                        ->where(function ($q) {
+                            $q->whereNull('proyek')
+                                ->orWhereRaw("UPPER(TRIM(proyek)) != 'ACCESSORIES'");
+                        })
+                        ->where(function ($q) {
+                            $q->whereNull('is_addon')->orWhere('is_addon', false);
+                        })
+                        ->selectRaw("UPPER(TRIM(brandName)) as norm_brand, COUNT(*) as total_count")
+                        ->groupByRaw("UPPER(TRIM(brandName))")
+                        ->orderByDesc('total_count')
+                        ->get();
+
+                    $brandMap = [];
+                    foreach ($brandRows as $row) {
+                        $b = strtoupper(trim($cleanUtf8($row->norm_brand)));
+                        if ($b !== '' && !in_array($b, ['COSTUM', 'OTHERS', 'OTHERS ACC', 'OEM'], true)) {
+                            $brandMap[$b] = (int) $row->total_count;
+                        }
+                    }
+                    $mustBrands = array_merge(
+                        ['APPLE'],
+                        $tradeInSettings['tradein_old_allowed_brands'] ?? [],
+                        $tradeInSettings['tradein_target_second_allowed_brands'] ?? [],
+                        $tradeInSettings['tradein_target_new_allowed_brands'] ?? []
+                    );
+                    foreach ($mustBrands as $mb) {
+                        $b = strtoupper(trim((string) $mb));
+                        if ($b !== '' && !isset($brandMap[$b])) {
+                            $brandMap[$b] = 0;
+                        }
+                    }
+                    ksort($brandMap);
+                    $availableTradeInBrands = collect($brandMap)
+                        ->map(fn($cnt, $name) => ['name' => $name, 'count' => $cnt])
+                        ->values()
+                        ->all();
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load trade-in brands: ' . $e->getMessage());
+            }
+
             return Inertia::render('Settings/Index', [
                 'globalSettings' => $globalSettings,
                 'referralSettings' => $referralSettings,
                 'tradeInSettings' => $tradeInSettings,
                 'availableProyeks' => $availableProyeks,
+                'availableTradeInBrands' => $availableTradeInBrands,
                 'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
                 'buSettings' => [
                     'online_warehouse_id' => $onlineWarehouseId ? (int) $onlineWarehouseId : null,
@@ -409,6 +470,9 @@ class EcommerceSettingsController extends Controller
                     'tradein_old_allowed_proyeks' => [],
                     'tradein_target_new_allowed_proyeks' => [],
                     'tradein_target_second_allowed_proyeks' => [],
+                    'tradein_old_allowed_brands' => [],
+                    'tradein_target_second_allowed_brands' => ['APPLE'],
+                    'tradein_target_new_allowed_brands' => [],
                     'tradein_group_old_devices' => true,
                     'tradein_group_target_devices' => true,
                     'tradein_second_price_source' => 'custom_fallback',
@@ -419,6 +483,7 @@ class EcommerceSettingsController extends Controller
                     'tradein_exclude_accessories' => true,
                 ],
                 'availableProyeks' => ['INTER', 'NON-PROYEK', 'RESMI'],
+                'availableTradeInBrands' => [['name' => 'APPLE', 'count' => 0]],
                 'selectedBuId' => null,
                 'buSettings' => [
                     'online_warehouse_id' => null,
@@ -565,6 +630,12 @@ class EcommerceSettingsController extends Controller
             'tradein_target_new_allowed_proyeks.*' => 'string|max:50',
             'tradein_target_second_allowed_proyeks' => 'nullable|array',
             'tradein_target_second_allowed_proyeks.*' => 'string|max:50',
+            'tradein_old_allowed_brands' => 'nullable|array',
+            'tradein_old_allowed_brands.*' => 'string|max:80',
+            'tradein_target_second_allowed_brands' => 'nullable|array',
+            'tradein_target_second_allowed_brands.*' => 'string|max:80',
+            'tradein_target_new_allowed_brands' => 'nullable|array',
+            'tradein_target_new_allowed_brands.*' => 'string|max:80',
             'tradein_group_old_devices' => 'boolean',
             'tradein_group_target_devices' => 'boolean',
             'tradein_second_price_source' => 'required|in:custom_fallback,custom_only,accurate_only',
@@ -593,6 +664,9 @@ class EcommerceSettingsController extends Controller
         $settingService->set('tradein_old_allowed_proyeks', $normalizeList($validated['tradein_old_allowed_proyeks'] ?? []), 'json');
         $settingService->set('tradein_target_new_allowed_proyeks', $normalizeList($validated['tradein_target_new_allowed_proyeks'] ?? []), 'json');
         $settingService->set('tradein_target_second_allowed_proyeks', $normalizeList($validated['tradein_target_second_allowed_proyeks'] ?? []), 'json');
+        $settingService->set('tradein_old_allowed_brands', $normalizeList($validated['tradein_old_allowed_brands'] ?? []), 'json');
+        $settingService->set('tradein_target_second_allowed_brands', $normalizeList($validated['tradein_target_second_allowed_brands'] ?? []), 'json');
+        $settingService->set('tradein_target_new_allowed_brands', $normalizeList($validated['tradein_target_new_allowed_brands'] ?? []), 'json');
         $settingService->set('tradein_group_old_devices', !empty($validated['tradein_group_old_devices']), 'boolean');
         $settingService->set('tradein_group_target_devices', !empty($validated['tradein_group_target_devices']), 'boolean');
         $settingService->set('tradein_second_price_source', $validated['tradein_second_price_source'], 'string');

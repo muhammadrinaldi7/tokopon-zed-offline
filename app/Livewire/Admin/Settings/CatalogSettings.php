@@ -18,6 +18,9 @@ class CatalogSettings extends Component
     public array $tradeinOldAllowedProyeks = [];
     public array $tradeinTargetNewAllowedProyeks = [];
     public array $tradeinTargetSecondAllowedProyeks = [];
+    public array $tradeinOldAllowedBrands = [];
+    public array $tradeinTargetSecondAllowedBrands = ['APPLE'];
+    public array $tradeinTargetNewAllowedBrands = [];
     public bool $tradeinGroupOldDevices = true;
     public bool $tradeinGroupTargetDevices = true;
     public string $tradeinSecondPriceSource = 'custom_fallback';
@@ -42,6 +45,9 @@ class CatalogSettings extends Component
         $this->tradeinOldAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_old_allowed_proyeks', []));
         $this->tradeinTargetNewAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_target_new_allowed_proyeks', []));
         $this->tradeinTargetSecondAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_target_second_allowed_proyeks', []));
+        $this->tradeinOldAllowedBrands = $this->normalizeProyekList($settingService->get('tradein_old_allowed_brands', []));
+        $this->tradeinTargetSecondAllowedBrands = $this->normalizeProyekList($settingService->get('tradein_target_second_allowed_brands', ['APPLE']));
+        $this->tradeinTargetNewAllowedBrands = $this->normalizeProyekList($settingService->get('tradein_target_new_allowed_brands', []));
 
         $this->tradeinGroupOldDevices = (bool) $settingService->get('tradein_group_old_devices', true);
         $this->tradeinGroupTargetDevices = (bool) $settingService->get('tradein_group_target_devices', true);
@@ -75,6 +81,9 @@ class CatalogSettings extends Component
         $this->tradeinOldAllowedProyeks = $this->normalizeProyekList($this->tradeinOldAllowedProyeks);
         $this->tradeinTargetNewAllowedProyeks = $this->normalizeProyekList($this->tradeinTargetNewAllowedProyeks);
         $this->tradeinTargetSecondAllowedProyeks = $this->normalizeProyekList($this->tradeinTargetSecondAllowedProyeks);
+        $this->tradeinOldAllowedBrands = $this->normalizeProyekList($this->tradeinOldAllowedBrands);
+        $this->tradeinTargetSecondAllowedBrands = $this->normalizeProyekList($this->tradeinTargetSecondAllowedBrands);
+        $this->tradeinTargetNewAllowedBrands = $this->normalizeProyekList($this->tradeinTargetNewAllowedBrands);
 
         $this->validate([
             'minimumStockThreshold' => 'required|integer|min:0',
@@ -87,6 +96,12 @@ class CatalogSettings extends Component
             'tradeinTargetNewAllowedProyeks.*' => 'string|max:50',
             'tradeinTargetSecondAllowedProyeks' => 'array',
             'tradeinTargetSecondAllowedProyeks.*' => 'string|max:50',
+            'tradeinOldAllowedBrands' => 'array',
+            'tradeinOldAllowedBrands.*' => 'string|max:80',
+            'tradeinTargetSecondAllowedBrands' => 'array',
+            'tradeinTargetSecondAllowedBrands.*' => 'string|max:80',
+            'tradeinTargetNewAllowedBrands' => 'array',
+            'tradeinTargetNewAllowedBrands.*' => 'string|max:80',
             'tradeinGroupOldDevices' => 'boolean',
             'tradeinGroupTargetDevices' => 'boolean',
             'tradeinSecondPriceSource' => 'required|in:custom_fallback,custom_only,accurate_only',
@@ -106,6 +121,9 @@ class CatalogSettings extends Component
         $settingService->set('tradein_old_allowed_proyeks', $this->tradeinOldAllowedProyeks, 'json');
         $settingService->set('tradein_target_new_allowed_proyeks', $this->tradeinTargetNewAllowedProyeks, 'json');
         $settingService->set('tradein_target_second_allowed_proyeks', $this->tradeinTargetSecondAllowedProyeks, 'json');
+        $settingService->set('tradein_old_allowed_brands', $this->tradeinOldAllowedBrands, 'json');
+        $settingService->set('tradein_target_second_allowed_brands', $this->tradeinTargetSecondAllowedBrands, 'json');
+        $settingService->set('tradein_target_new_allowed_brands', $this->tradeinTargetNewAllowedBrands, 'json');
         $settingService->set('tradein_group_old_devices', $this->tradeinGroupOldDevices, 'boolean');
         $settingService->set('tradein_group_target_devices', $this->tradeinGroupTargetDevices, 'boolean');
         $settingService->set('tradein_second_price_source', $this->tradeinSecondPriceSource, 'string');
@@ -139,6 +157,47 @@ class CatalogSettings extends Component
             ->values()
             ->all();
 
-        return view('livewire.admin.settings.catalog-settings', compact('businessUnits', 'availableProyeks'));
+        // Ambil daftar brand smartphone (HP / Handphone / HP SECOND) beserta jumlah SKU-nya
+        $brandRows = ProductAccurate::query()
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->where(function ($q) {
+                $q->where('categoryName', 'like', '%Handphone%')
+                    ->orWhere('categoryName', 'like', '%HP SECOND%')
+                    ->orWhere('categoryName', 'like', '%HP NEW%')
+                    ->orWhere('name', 'like', '%HP 2ND%');
+            })
+            ->where(function ($q) {
+                $q->whereNull('proyek')
+                    ->orWhereRaw("UPPER(TRIM(proyek)) != 'ACCESSORIES'");
+            })
+            ->where(function ($q) {
+                $q->whereNull('is_addon')->orWhere('is_addon', false);
+            })
+            ->selectRaw("UPPER(TRIM(brandName)) as norm_brand, COUNT(*) as total_count")
+            ->groupByRaw("UPPER(TRIM(brandName))")
+            ->orderByDesc('total_count')
+            ->get();
+
+        $brandMap = [];
+        foreach ($brandRows as $row) {
+            $b = strtoupper(trim((string) $row->norm_brand));
+            if ($b !== '' && !in_array($b, ['COSTUM', 'OTHERS', 'OTHERS ACC', 'OEM'], true)) {
+                $brandMap[$b] = (int) $row->total_count;
+            }
+        }
+        foreach (array_merge(['APPLE'], $this->tradeinOldAllowedBrands, $this->tradeinTargetSecondAllowedBrands, $this->tradeinTargetNewAllowedBrands) as $mustHave) {
+            $b = strtoupper(trim((string) $mustHave));
+            if ($b !== '' && !isset($brandMap[$b])) {
+                $brandMap[$b] = 0;
+            }
+        }
+        ksort($brandMap);
+        $availableBrands = collect($brandMap)
+            ->map(fn($cnt, $name) => ['name' => $name, 'count' => $cnt])
+            ->values()
+            ->all();
+
+        return view('livewire.admin.settings.catalog-settings', compact('businessUnits', 'availableProyeks', 'availableBrands'));
     }
 }

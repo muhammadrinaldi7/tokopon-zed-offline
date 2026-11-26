@@ -27,19 +27,24 @@ class PublicTradeInController extends Controller
 
         $this->applyExcludeAccessories($query, $excludeAccessories);
 
+        $allowedBrands = [];
+
         if ($type === 'new') {
             // HP Baru: BU 1 (Syihab) & Kategori Handphone
             $query->where('business_unit_id', 1)
                 ->where('categoryName', 'like', '%Handphone%')
                 ->where('base_price', '>', 0);
 
+            $allowedBrands = $this->resolveAllowedBrands('tradein_target_new_allowed_brands', []);
+            $this->applyAllowedBrandsFilter($query, $allowedBrands);
             $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_target_new_allowed_proyeks'));
         } elseif ($type === 'second') {
-            // HP Second: BU 2 (GSK Second) & Kategori HP SECOND & Khusus APPLE
+            // HP Second: BU 2 (GSK Second) & Kategori HP SECOND (Brand dinamis dari Pengaturan, default ['APPLE'])
             $query->where('business_unit_id', 2)
-                ->where('categoryName', 'like', '%HP SECOND%')
-                ->whereRaw('UPPER(brandName) = ?', ['APPLE']);
+                ->where('categoryName', 'like', '%HP SECOND%');
 
+            $allowedBrands = $this->resolveAllowedBrands('tradein_target_second_allowed_brands', ['APPLE']);
+            $this->applyAllowedBrandsFilter($query, $allowedBrands);
             $this->applySecondSellPriceFilter($query, $secondPriceSource);
             $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_target_second_allowed_proyeks'));
         } elseif ($type === 'old') {
@@ -47,6 +52,8 @@ class PublicTradeInController extends Controller
             $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
 
             $query->whereIn('business_unit_id', $oldBuIds);
+            $allowedBrands = $this->resolveAllowedBrands('tradein_old_allowed_brands', []);
+            $this->applyAllowedBrandsFilter($query, $allowedBrands);
             $this->applyOldBuyPriceFilter($query, $oldPriceSource);
             $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_old_allowed_proyeks'));
 
@@ -70,12 +77,16 @@ class PublicTradeInController extends Controller
 
         $brands = $query->distinct()
             ->pluck('brandName')
-            ->sort()
+            ->map(fn($b) => trim((string) $b))
+            ->filter(fn($b) => $b !== '')
+            ->unique(fn($b) => strtoupper($b))
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
         return response()->json([
             'status' => 'success',
             'type' => $type,
+            'allowed_brands' => $allowedBrands,
             'data' => $brands,
         ]);
     }
@@ -96,6 +107,7 @@ class PublicTradeInController extends Controller
 
         $oldBuIds = $this->resolveOldBusinessUnitIds($request);
         $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
+        $allowedBrands = $this->resolveAllowedBrands('tradein_old_allowed_brands', []);
         $allowedProyeks = $this->resolveAllowedProyeks('tradein_old_allowed_proyeks');
         $priceStrategy = (string) $this->settingService->get('tradein_old_price_strategy', 'min');
         $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
@@ -108,9 +120,10 @@ class PublicTradeInController extends Controller
                     ->orWhere('name', 'like', '%HP 2ND%');
             })
             ->when($brand, function ($q) use ($brand) {
-                $q->where('brandName', $brand);
+                $q->whereRaw('UPPER(TRIM(brandName)) = ?', [strtoupper(trim((string) $brand))]);
             });
 
+        $this->applyAllowedBrandsFilter($query, $allowedBrands);
         $this->applyAllowedProyeksFilter($query, $allowedProyeks);
         $this->applySingleProyekQueryFilter($query, $proyek);
         $this->applyOldBuyPriceFilter($query, $oldPriceSource);
@@ -229,6 +242,7 @@ class PublicTradeInController extends Controller
             'status' => 'success',
             'grouped' => $isGrouped,
             'business_unit_ids' => $oldBuIds,
+            'allowed_brands' => $allowedBrands,
             'allowed_proyeks' => $allowedProyeks,
             'price_source_mode' => $oldPriceSource,
             'total' => $devices->count(),
@@ -256,6 +270,9 @@ class PublicTradeInController extends Controller
         $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
         $accurateMarkupPercent = max(0.0, (float) $this->settingService->get('tradein_second_accurate_markup_percent', 0));
         $accurateRounding = max(0, (int) $this->settingService->get('tradein_second_accurate_rounding', 0));
+        $allowedBrands = $targetType === 'second'
+            ? $this->resolveAllowedBrands('tradein_target_second_allowed_brands', ['APPLE'])
+            : $this->resolveAllowedBrands('tradein_target_new_allowed_brands', []);
         $allowedProyeks = $this->resolveAllowedProyeks(
             $targetType === 'second'
                 ? 'tradein_target_second_allowed_proyeks'
@@ -267,10 +284,9 @@ class PublicTradeInController extends Controller
         $query = ProductAccurate::query();
 
         if ($targetType === 'second') {
-            // HP Second: BU 2 & Kategori HP SECOND & Khusus APPLE
+            // HP Second: BU 2 & Kategori HP SECOND (Brand dinamis dari Pengaturan, default ['APPLE'])
             $query->where('business_unit_id', 2)
-                ->where('categoryName', 'like', '%HP SECOND%')
-                ->whereRaw('UPPER(brandName) = ?', ['APPLE']);
+                ->where('categoryName', 'like', '%HP SECOND%');
 
             $this->applySecondSellPriceFilter($query, $secondPriceSource);
         } else {
@@ -280,10 +296,11 @@ class PublicTradeInController extends Controller
                 ->where('base_price', '>', 0);
         }
 
+        $this->applyAllowedBrandsFilter($query, $allowedBrands);
         $this->applyExcludeAccessories($query, $excludeAccessories);
 
         $query->when($brand, function ($q) use ($brand) {
-            $q->where('brandName', $brand);
+            $q->whereRaw('UPPER(TRIM(brandName)) = ?', [strtoupper(trim((string) $brand))]);
         });
 
         if (!empty($allowedProyeks)) {
@@ -426,6 +443,7 @@ class PublicTradeInController extends Controller
             'status' => 'success',
             'target_type' => $targetType,
             'grouped' => $isGrouped,
+            'allowed_brands' => $allowedBrands,
             'allowed_proyeks' => $allowedProyeks,
             'price_source_mode' => $targetType === 'second' ? $secondPriceSource : 'accurate_only',
             'accurate_markup_percent' => $targetType === 'second' ? $accurateMarkupPercent : 0,
@@ -603,6 +621,41 @@ class PublicTradeInController extends Controller
         }
 
         return [2];
+    }
+
+    /**
+     * Resolusi daftar brand (whitelist) yang diizinkan tampil berdasarkan key setting.
+     * Jika array kosong [], berarti semua brand diizinkan.
+     */
+    private function resolveAllowedBrands(string $settingKey, array $default = []): array
+    {
+        $configured = $this->settingService->get($settingKey, $default);
+        if (is_string($configured)) {
+            $decoded = json_decode($configured, true);
+            $configured = is_array($decoded) ? $decoded : explode(',', $configured);
+        }
+
+        if (!is_array($configured)) {
+            return $default;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(fn($b) => strtoupper(trim((string) $b)), $configured),
+            fn($b) => $b !== ''
+        )));
+    }
+
+    /**
+     * Terapkan filter whitelist brand secara case-insensitive.
+     */
+    private function applyAllowedBrandsFilter($query, array $allowedBrands): void
+    {
+        if (empty($allowedBrands)) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($allowedBrands), '?'));
+        $query->whereRaw("UPPER(TRIM(COALESCE(brandName, ''))) IN ({$placeholders})", $allowedBrands);
     }
 
     /**
