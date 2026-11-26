@@ -150,39 +150,122 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex flex-col gap-1">
+                                @php
+                                    $orderBundleSkus = $order->promos
+                                        ->where('is_bundle', true)
+                                        ->flatMap(fn($p) => $p->bundleSkus->pluck('sku'))
+                                        ->merge(
+                                            $order->items->flatMap(fn($it) => $it->promos->where('is_bundle', true)->flatMap(fn($p) => $p->bundleSkus->pluck('sku')))
+                                        )
+                                        ->filter()
+                                        ->map(fn($s) => trim((string) $s))
+                                        ->unique()
+                                        ->values()
+                                        ->all();
+                                @endphp
+                                <div class="flex flex-col gap-1.5">
                                     @foreach ($order->items as $item)
                                         @php
                                             $variant = $item->variant;
-                                            $name =
-                                                $variant?->name ??
-                                                ($variant?->product?->name ?? ($item->product_name ?? 'Unknown'));
-                                            $merk =
-                                                $variant?->brandName ??
-                                                ($variant?->accurateData?->brandName ??
-                                                    ($variant?->product?->brand?->name ?? 'Unknown'));
+                                            $name = $variant?->name ?? ($item->product_name ?? 'Unknown');
+                                            $merk = $variant?->brandName ?? 'Unknown';
+                                            $itemSku = trim((string) ($variant?->item_no ?? ''));
+                                            $isBundleProduct = $itemSku !== '' && in_array($itemSku, $orderBundleSkus, true);
+                                            $itemSns = $item->serialNumbers
+                                                ->pluck('serial_number')
+                                                ->filter()
+                                                ->values()
+                                                ->all();
+                                            if (empty($itemSns) && !empty($item->serial_number)) {
+                                                $itemSns = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
+                                            }
                                         @endphp
-                                        <div class="text-sm text-gray-900 flex items-center justify-between gap-4">
-                                            <span>
-                                                <span class="font-bold">[{{ $merk }}]</span> {{ $name }}
-                                                <span class="text-gray-500 text-xs">x{{ $item->qty }}</span>
-                                            </span>
+                                        <div class="text-sm text-gray-900 flex flex-col gap-0.5">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span>
+                                                    <span class="font-bold">[{{ $merk }}]</span> {{ $name }}
+                                                    <span class="text-gray-500 text-xs">x{{ $item->qty }}</span>
+                                                </span>
+                                                @if ($isBundleProduct)
+                                                    <span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800">Bundling</span>
+                                                @endif
+                                            </div>
+                                            @if (!empty($itemSns))
+                                                <div class="text-xs text-gray-500 font-mono">
+                                                    SN: {{ implode(', ', $itemSns) }}
+                                                </div>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex flex-col gap-1">
+                                <div class="flex flex-col gap-1.5">
                                     @foreach ($order->items as $item)
+                                        @php
+                                            $variant = $item->variant;
+                                            $itemSku = trim((string) ($variant?->item_no ?? ''));
+                                            $fallbackItemSns = $item->serialNumbers
+                                                ->pluck('serial_number')
+                                                ->filter()
+                                                ->values()
+                                                ->all();
+                                            if (empty($fallbackItemSns) && !empty($item->serial_number)) {
+                                                $fallbackItemSns = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
+                                            }
+                                        @endphp
                                         @foreach ($item->promos as $promo)
+                                            @php
+                                                $promoBundleSkus = $promo->is_bundle
+                                                    ? $promo->bundleSkus->pluck('sku')->filter()->map(fn($s) => trim((string) $s))->unique()->values()->all()
+                                                    : [];
+                                                $isCurrentBundleItem = $promo->is_bundle && $itemSku !== '' && in_array($itemSku, $promoBundleSkus, true);
+                                                $displaySn = !empty($promo->pivot->serial_number)
+                                                    ? $promo->pivot->serial_number
+                                                    : (!empty($fallbackItemSns) ? implode(', ', $fallbackItemSns) : '');
+
+                                                $bundleEntries = [];
+                                                if ($promo->is_bundle && !$isCurrentBundleItem && !empty($promoBundleSkus)) {
+                                                    foreach ($order->items as $bItem) {
+                                                        $bVariant = $bItem->variant;
+                                                        $bSku = trim((string) ($bVariant?->item_no ?? ''));
+                                                        if ($bSku === '' || !in_array($bSku, $promoBundleSkus, true)) {
+                                                            continue;
+                                                        }
+                                                        $bName = $bVariant?->name ?? ($bItem->product_name ?? 'Unknown');
+                                                        $bPivotSns = $bItem->promos
+                                                            ->where('id', $promo->id)
+                                                            ->pluck('pivot.serial_number')
+                                                            ->filter()
+                                                            ->values()
+                                                            ->all();
+                                                        if (empty($bPivotSns)) {
+                                                            $bPivotSns = $bItem->serialNumbers->pluck('serial_number')->filter()->values()->all();
+                                                        }
+                                                        if (empty($bPivotSns) && !empty($bItem->serial_number)) {
+                                                            $bPivotSns = array_values(array_filter(array_map('trim', explode(',', $bItem->serial_number))));
+                                                        }
+                                                        $bEntryText = $bName . ' x' . $bItem->qty;
+                                                        if (!empty($bPivotSns)) {
+                                                            $bEntryText .= ' [SN: ' . implode(', ', array_unique($bPivotSns)) . ']';
+                                                        }
+                                                        $bundleEntries[] = $bEntryText;
+                                                    }
+                                                }
+                                            @endphp
                                             <div
                                                 class="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
-                                                @if (!empty($promo->pivot->serial_number))
+                                                @if ($displaySn !== '')
                                                     <span class="font-bold text-xs text-purple-800">[SN:
-                                                        {{ $promo->pivot->serial_number }}]</span>
+                                                        {{ $displaySn }}]</span>
                                                 @endif
                                                 {{ $promo->name }}
                                                 - Rp {{ number_format($promo->pivot->discount_amount, 0, ',', '.') }}
+                                                @if (!empty($bundleEntries))
+                                                    <div class="text-xs text-amber-700 font-normal mt-0.5">
+                                                        Bundling: {{ implode('; ', $bundleEntries) }}
+                                                    </div>
+                                                @endif
                                             </div>
                                         @endforeach
                                     @endforeach
