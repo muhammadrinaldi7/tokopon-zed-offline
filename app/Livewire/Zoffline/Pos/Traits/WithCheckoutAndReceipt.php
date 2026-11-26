@@ -1497,12 +1497,15 @@ trait WithCheckoutAndReceipt
 
         $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
         $printer->text($storeName . "\n");
-        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text($this->completedOrder->receipt_date_formatted . "\n");
         $printer->text($separator);
 
         // Info (Left)
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
         $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, $maxColumns) . "\n");
+        if ($this->completedOrder->so_created_date_label) {
+            $printer->text($this->formatLine("Tgl. SO", $this->completedOrder->so_created_date_label, $maxColumns) . "\n");
+        }
         $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
@@ -2112,7 +2115,8 @@ trait WithCheckoutAndReceipt
             $totalDiscountAmount = $discountTotal + $promoDiscountTotal;
 
             $order->update([
-                'order_date' => now()->format('Y-m-d'),
+                'order_date' => !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date)->format('Y-m-d') : now()->format('Y-m-d'),
+                'handled_by' => Auth::id(),
                 'total_amount' => $subTotal,
                 'discount_amount' => $totalDiscountAmount,
                 'grand_total' => $grandTotal,

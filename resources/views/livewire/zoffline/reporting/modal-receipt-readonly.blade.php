@@ -69,7 +69,7 @@
                         {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}
                     </p>
                     <p class="text-[10px] text-gray-400 mt-0.5">
-                        {{ $completedOrder->created_at->format('d/m/Y H:i') }}
+                        {{ $completedOrder->receipt_date_formatted }}
                     </p>
                 </div>
 
@@ -80,6 +80,12 @@
                         <span>No. Transaksi</span>
                         <span class="font-bold font-mono text-gray-900">{{ $completedOrder->order_number }}</span>
                     </div>
+                    @if ($completedOrder->so_created_date_label)
+                        <div class="flex justify-between">
+                            <span>Tgl. SO</span>
+                            <span>{{ $completedOrder->so_created_date_label }}</span>
+                        </div>
+                    @endif
                     <div class="flex justify-between">
                         <span>Kasir</span>
                         <span>{{ $completedOrder->handledBy->name ?? '-' }}</span>

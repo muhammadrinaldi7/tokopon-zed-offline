@@ -55,6 +55,74 @@ class Order extends Model
         });
     }
 
+    /**
+     * Format tanggal transaksi untuk struk (Modal, PDF, Thermal ESC/POS).
+     * Mengutamakan order_date (tanggal pelunasan / transaksi efektif) agar sinkron
+     * dengan Laporan Penjualan & Accurate, bukan sekadar created_at (pembuatan SO/Draft).
+     */
+    public function getReceiptDateFormattedAttribute(): string
+    {
+        $baseDate = $this->order_date
+            ? \Carbon\Carbon::parse($this->order_date)
+            : ($this->created_at ? $this->created_at->copy() : now());
+
+        $dateStr = $baseDate->format('Y-m-d');
+        $timeStr = null;
+
+        // 1. Cek jam dari pembayaran pelunasan terakhir yang tanggalnya sama dengan order_date
+        if ($this->relationLoaded('payments') || $this->exists) {
+            $latestPaid = $this->payments
+                ->filter(fn($p) => !empty($p->paid_at))
+                ->sortByDesc('paid_at')
+                ->first();
+
+            if ($latestPaid) {
+                $paidAt = \Carbon\Carbon::parse($latestPaid->paid_at);
+                if ($paidAt->format('Y-m-d') === $dateStr) {
+                    $timeStr = $paidAt->format('H:i');
+                }
+            }
+        }
+
+        // 2. Jika tidak ada, cek jam dari updated_at jika di tanggal yang sama (misal pelunasan SO/Draft)
+        if (!$timeStr && $this->updated_at && $this->updated_at->format('Y-m-d') === $dateStr) {
+            $timeStr = $this->updated_at->format('H:i');
+        }
+
+        // 3. Jika tidak ada, cek jam dari created_at jika di tanggal yang sama (POS normal)
+        if (!$timeStr && $this->created_at && $this->created_at->format('Y-m-d') === $dateStr) {
+            $timeStr = $this->created_at->format('H:i');
+        }
+
+        // 4. Jika transaksi backdate murni (tanggal berbeda dari created_at & updated_at), tampilkan tanggal saja
+        return $timeStr
+            ? $baseDate->format('d/m/Y') . ' ' . $timeStr
+            : $baseDate->format('d/m/Y');
+    }
+
+    /**
+     * Mengembalikan tanggal pembuatan SO (d/m/Y) apabila order berasal dari SO
+     * dan dilunasi pada tanggal berbeda dari tanggal pembuatan SO.
+     */
+    public function getSoCreatedDateLabelAttribute(): ?string
+    {
+        $isSo = strtoupper((string) $this->order_channel) === 'SO'
+            || str_starts_with((string) $this->order_number, 'SO-');
+
+        if (!$isSo || !$this->created_at || !$this->order_date) {
+            return null;
+        }
+
+        $orderDateStr = \Carbon\Carbon::parse($this->order_date)->format('Y-m-d');
+        $createdDateStr = $this->created_at->format('Y-m-d');
+
+        if ($orderDateStr !== $createdDateStr) {
+            return $this->created_at->format('d/m/Y');
+        }
+
+        return null;
+    }
+
     public function getMdrExpenseDetails()
     {
         $expenses = [];

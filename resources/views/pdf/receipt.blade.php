@@ -62,7 +62,7 @@
     <div class="text-center">
         <p class="font-bold" style="font-size: 14px; margin: 0 0 2px 0;">{{ optional($order->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE' }}</p>
         <p style="margin: 0 0 2px 0;">{{ $order->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
-        <p style="margin: 0; font-size: 11px;">{{ $order->created_at->format('d/m/Y H:i') }}</p>
+        <p style="margin: 0; font-size: 11px;">{{ $order->receipt_date_formatted }}</p>
     </div>
 
     <div class="divider"></div>
@@ -70,8 +70,14 @@
     <table class="item-table">
         <tr>
             <td>Tanggal:</td>
-            <td class="text-right">{{ $order->created_at->format('d/m/Y H:i') }}</td>
+            <td class="text-right">{{ $order->receipt_date_formatted }}</td>
         </tr>
+        @if ($order->so_created_date_label)
+        <tr>
+            <td>Tgl. SO:</td>
+            <td class="text-right">{{ $order->so_created_date_label }}</td>
+        </tr>
+        @endif
         <tr>
             <td>No:</td>
             <td class="text-right">{{ $order->order_number }}</td>

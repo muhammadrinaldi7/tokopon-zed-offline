@@ -243,12 +243,16 @@
                            {{ optional($completedOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
                        <p class="text-[10px] text-gray-500">
                            {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
-                       <p class="text-[10px] text-gray-400">{{ $completedOrder->created_at->format('d/m/Y H:i') }}
+                       <p class="text-[10px] text-gray-400">{{ $completedOrder->receipt_date_formatted }}
                        </p>
                    </div>
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    <p class="text-[10px] text-gray-500">Tanggal:
-                       {{ $completedOrder->created_at->format('d/m/Y H:i') }}</p>
+                       {{ $completedOrder->receipt_date_formatted }}</p>
+                   @if ($completedOrder->so_created_date_label)
+                       <p class="text-[10px] text-gray-500">Tgl. SO:
+                           {{ $completedOrder->so_created_date_label }}</p>
+                   @endif
                    <p class="text-[10px] text-gray-500">No: {{ $completedOrder->order_number }}</p>
                    <p class="text-[10px] text-gray-500">Kasir: {{ $completedOrder->handledBy->name ?? '-' }}</p>
                    <p class="text-[10px] text-gray-500">Sales: {{ $completedOrder->salesBy->name ?? '-' }}
