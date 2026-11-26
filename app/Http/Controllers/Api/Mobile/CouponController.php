@@ -120,35 +120,10 @@ class CouponController extends Controller
     }
 
     /**
-     * Temukan user dari token otentikasi atau variasi nomor telepon header/query/body.
+     * Temukan user HANYA dari token autentikasi Sanctum (Anti-IDOR, tidak mengizinkan lookup user lain via ?phone=).
      */
     protected function resolveCustomerUser(Request $request): ?User
     {
-        $user = $request->user();
-        if ($user) {
-            return $user;
-        }
-
-        $phone = $request->input('phone') ?? $request->query('phone') ?? $request->header('X-Customer-Phone');
-        if (!empty($phone)) {
-            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $phone);
-            if (!empty($cleanPhone)) {
-                $phoneVariations = [$cleanPhone];
-                if (str_starts_with($cleanPhone, '0')) {
-                    $phoneVariations[] = '62' . substr($cleanPhone, 1);
-                } elseif (str_starts_with($cleanPhone, '62')) {
-                    $phoneVariations[] = '0' . substr($cleanPhone, 2);
-                }
-
-                $profile = UserProfile::whereIn('phone_number', $phoneVariations)->first();
-                if ($profile && $profile->user) {
-                    return $profile->user;
-                }
-
-                return User::where('email', $cleanPhone . '@tokopon.internal')->first();
-            }
-        }
-
-        return null;
+        return $request->user('sanctum') ?? $request->user();
     }
 }

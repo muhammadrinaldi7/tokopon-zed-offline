@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Support\InputSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -129,9 +130,32 @@ class AuthController extends Controller
             ], 422);
         }
 
+        // Anti-XSS: Tolak tag HTML / payload skrip pada nama atau alamat
+        if (InputSanitizer::containsHtmlOrScript($request->input('name'))
+            || InputSanitizer::containsHtmlOrScript($request->input('address'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama atau alamat tidak boleh mengandung tag HTML atau skrip berbahaya.',
+            ], 422);
+        }
+
+        $sanitizedPayload = array_merge($request->all(), [
+            'name' => InputSanitizer::cleanPlainText($request->input('name'), 120),
+            'address' => $request->filled('address')
+                ? InputSanitizer::cleanPlainText($request->input('address'), 500)
+                : null,
+        ]);
+
+        if ($sanitizedPayload['name'] === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama lengkap tidak valid.',
+            ], 422);
+        }
+
         try {
             $referralService = app(\App\Services\ReferralService::class);
-            $user = $referralService->registerOrClaimMember($request->all());
+            $user = $referralService->registerOrClaimMember($sanitizedPayload);
 
             $deviceName = $request->input('device_name') ?: 'TokoponMobileApp';
             $token = $user->createToken($deviceName, ['mobile:customer'])->plainTextToken;
@@ -187,9 +211,20 @@ class AuthController extends Controller
             ], 422);
         }
 
+        if (InputSanitizer::containsHtmlOrScript($request->input('name'))
+            || InputSanitizer::containsHtmlOrScript($request->input('address'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama atau alamat tidak boleh mengandung tag HTML atau skrip berbahaya.',
+            ], 422);
+        }
+
         if ($request->has('name') && !empty($request->name)) {
-            $user->name = trim($request->name);
-            $user->save();
+            $cleanName = InputSanitizer::cleanPlainText($request->name, 120);
+            if ($cleanName !== '') {
+                $user->name = $cleanName;
+                $user->save();
+            }
         }
 
         $profile = $user->profile ?: new UserProfile(['user_id' => $user->id]);
@@ -199,7 +234,7 @@ class AuthController extends Controller
             $profile->phone_number = $cleanPhone ?: null;
         }
         if ($request->has('address')) {
-            $profile->domisili = $request->address;
+            $profile->domisili = InputSanitizer::cleanPlainText($request->address, 500) ?: null;
         }
         $profile->save();
 

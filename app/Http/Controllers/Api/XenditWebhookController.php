@@ -17,10 +17,8 @@ class XenditWebhookController extends Controller
         $xenditToken = $request->header('x-callback-token');
         $storedToken = $settingService->get('xendit_webhook_token');
 
-        if (empty($storedToken) || $xenditToken !== $storedToken) {
-            Log::warning('Xendit Webhook Mismatch Token', [
-                'received' => $xenditToken,
-            ]);
+        if (empty($storedToken) || empty($xenditToken) || !hash_equals((string) $storedToken, (string) $xenditToken)) {
+            Log::warning('Xendit Webhook Mismatch Token');
             return response()->json(['message' => 'Invalid Token'], 403);
         }
 

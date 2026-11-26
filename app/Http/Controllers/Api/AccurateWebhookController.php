@@ -30,20 +30,31 @@ class AccurateWebhookController extends Controller
             return response()->json(['message' => 'Database tidak dikenali, harap setup di Admin'], 200);
         }
 
-        // 3. Keamanan: Cek X-Accurate-Signature jika Accurate Secret Key diisi di Business Unit
+        // 3. Keamanan Wajib: Jika BU memiliki Secret Key / Webhook Token, WAJIB lolos salah satu verifikasi!
         $signature = $request->header('X-Accurate-Signature');
-        if ($signature && !empty($bu->accurate_secret_key)) {
-            $expectedSignature = hash_hmac('sha256', $request->getContent(), $bu->accurate_secret_key);
-            if (!hash_equals($expectedSignature, $signature)) {
-                Log::warning("Accurate Webhook Ditolak: Signature tidak valid untuk BU {$bu->name}.");
-                return response()->json(['message' => 'Invalid Signature'], 401);
+        $urlToken = (string) $request->query('token', '');
+        $hasSecret = !empty($bu->accurate_secret_key);
+        $hasWebhookToken = !empty($bu->accurate_webhook_token);
+
+        if ($hasSecret || $hasWebhookToken) {
+            $verified = false;
+
+            if ($signature && $hasSecret) {
+                $expectedSignature = hash_hmac('sha256', $request->getContent(), $bu->accurate_secret_key);
+                if (hash_equals($expectedSignature, (string) $signature)) {
+                    $verified = true;
+                }
             }
-        } elseif (!$signature && $request->query('token')) {
-            // Fallback: Menggunakan ?token= di URL (biasanya AppKey atau custom token)
-            // Mengecek ke kolom accurate_webhook_token milik Business Unit
-            if ($request->query('token') !== $bu->accurate_webhook_token) {
-                Log::warning("Accurate Webhook Ditolak: Token URL salah untuk BU {$bu->name}. URL Token: " . $request->query('token') . ' != DB: ' . $bu->accurate_webhook_token);
-                return response()->json(['message' => 'Unauthorized Token'], 401);
+
+            if (!$verified && $urlToken !== '' && $hasWebhookToken) {
+                if (hash_equals((string) $bu->accurate_webhook_token, $urlToken)) {
+                    $verified = true;
+                }
+            }
+
+            if (!$verified) {
+                Log::warning("Accurate Webhook Ditolak: Signature/Token tidak valid atau kosong untuk BU {$bu->name}.");
+                return response()->json(['message' => 'Unauthorized Webhook'], 401);
             }
         }
 

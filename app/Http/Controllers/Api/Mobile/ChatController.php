@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\ProductAccurate;
+use App\Support\InputSanitizer;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -66,9 +67,21 @@ class ChatController extends Controller
     public function initConversation(Request $request): JsonResponse
     {
         $user = $this->resolveUser($request);
-        $guestToken = $request->input('guest_token') ?: $request->header('X-Guest-Token');
-        $guestName = $request->input('guest_name');
-        $guestPhone = $request->input('guest_phone');
+        $rawGuestToken = trim((string) ($request->input('guest_token') ?: $request->header('X-Guest-Token') ?: ''));
+        // Tolak guest_token lemah/pendek buatan klien (harus >= 24 karakter agar tidak mudah ditebak)
+        $guestToken = strlen($rawGuestToken) >= 24 ? $rawGuestToken : null;
+
+        $rawGuestName = $request->input('guest_name');
+        if (InputSanitizer::containsHtmlOrScript($rawGuestName)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama tamu tidak boleh mengandung tag HTML atau karakter berbahaya.',
+            ], 422);
+        }
+        $guestName = $rawGuestName !== null ? (InputSanitizer::cleanPlainText((string) $rawGuestName, 100) ?: null) : null;
+        $guestPhone = $request->filled('guest_phone')
+            ? preg_replace('/[^0-9+]/', '', (string) $request->input('guest_phone'))
+            : null;
         $pushToken = $request->input('push_token');
         $businessUnitId = $request->input('business_unit_id');
         $productAccurateId = $request->input('product_accurate_id') ?: $request->input('product_id');
@@ -129,13 +142,17 @@ class ChatController extends Controller
         // 2. Skenario Guest Chat (Tanpa Login)
         else {
             if ($guestToken) {
-                $conversation = Conversation::where('guest_token', $guestToken)->first();
+                // Guest HANYA boleh mengakses sesi guest yang belum diklaim oleh user login (whereNull user_id)
+                $conversation = Conversation::where('guest_token', $guestToken)
+                    ->whereNull('user_id')
+                    ->first();
             }
 
             if (!$conversation) {
-                $guestToken = $guestToken ?: 'guest_' . Str::random(32);
+                // Selalu generate token kriptografis acak di server (jangan pernah terima token buatan klien yang belum terdaftar)
+                $serverGuestToken = 'guest_' . bin2hex(random_bytes(24));
                 $conversation = Conversation::create([
-                    'guest_token' => $guestToken,
+                    'guest_token' => $serverGuestToken,
                     'guest_name' => $guestName ?: 'Tamu Mobile',
                     'guest_phone' => $guestPhone,
                     'push_token' => $pushToken,
@@ -270,7 +287,10 @@ class ChatController extends Controller
 
         $productAccurateId = $request->input('product_accurate_id') ?: $request->input('product_id');
 
-        if (empty($request->input('message')) && !$request->hasFile('attachment') && !$productAccurateId) {
+        $rawMessage = $request->input('message');
+        $cleanMessage = InputSanitizer::cleanMessage($rawMessage, 2000);
+
+        if ($cleanMessage === '' && !$request->hasFile('attachment') && !$productAccurateId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pesan teks, tag produk, atau lampiran wajib disertakan.',
@@ -294,7 +314,7 @@ class ChatController extends Controller
             'user_id' => $user?->id,
             'sender_type' => $senderType,
             'product_accurate_id' => $productAccurateId,
-            'message' => $request->input('message') ?: '',
+            'message' => $cleanMessage,
         ]);
 
         // Simpan lampiran file jika diunggah
@@ -431,10 +451,16 @@ class ChatController extends Controller
             }
         }
 
-        $guestToken = $request->header('X-Guest-Token') ?: $request->input('guest_token');
-        if ($guestToken && $conversation->guest_token && hash_equals((string) $conversation->guest_token, (string) $guestToken)) {
+        $guestToken = trim((string) ($request->header('X-Guest-Token') ?: $request->input('guest_token') ?: ''));
+        // Guest token HANYA berlaku jika percakapan belum dimiliki user login (user_id === null) & panjang >= 24
+        if (
+            $conversation->user_id === null
+            && strlen($guestToken) >= 24
+            && $conversation->guest_token
+            && hash_equals((string) $conversation->guest_token, $guestToken)
+        ) {
             // Jika user login membuka sesi guest miliknya yang belum ber-user_id, klaim percakapan ini
-            if ($user && !$conversation->user_id) {
+            if ($user) {
                 $conversation->update(['user_id' => $user->id]);
             }
             return;
@@ -502,13 +528,13 @@ class ChatController extends Controller
                 }
             }
 
-            // Fallback: Cek jika guest_token cocok (misal sesi dimulai sebelum login)
-            if (!$isAuthorized) {
-                $guestToken = $request->header('X-Guest-Token') ?: $request->input('guest_token');
-                if ($guestToken && $conversation->guest_token && hash_equals((string) $conversation->guest_token, (string) $guestToken)) {
+            // Fallback: Cek jika guest_token cocok (HANYA jika percakapan belum dimiliki user login)
+            if (!$isAuthorized && $conversation->user_id === null) {
+                $guestToken = trim((string) ($request->header('X-Guest-Token') ?: $request->input('guest_token') ?: ''));
+                if (strlen($guestToken) >= 24 && $conversation->guest_token && hash_equals((string) $conversation->guest_token, $guestToken)) {
                     $isAuthorized = true;
                     // Auto-claim jika user sudah login
-                    if ($user && !$conversation->user_id) {
+                    if ($user) {
                         $conversation->update(['user_id' => $user->id]);
                     }
                 }

@@ -8,6 +8,7 @@ use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\UserProfile;
 use App\Services\MobileOrderService;
+use App\Support\InputSanitizer;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,39 +26,22 @@ class OrderController extends Controller
     }
 
     /**
-     * Mengambil daftar riwayat pesanan pelanggan (User Login atau Nomor HP Pelanggan).
+     * Mengambil daftar riwayat pesanan milik pelanggan yang sedang terautentikasi (Anti-IDOR).
      */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $phone = $request->input('phone') ?? $request->header('X-Customer-Phone');
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan login terlebih dahulu untuk melihat riwayat pesanan.',
+            ], 401);
+        }
 
         $query = Order::with(['items.productAccurate', 'payments.paymentMethod', 'warehouse', 'pickupWarehouse', 'shipping'])
+            ->where('user_id', $user->id)
             ->orderBy('id', 'desc');
-
-        if ($user) {
-            $query->where('user_id', $user->id);
-        } elseif (!empty($phone)) {
-            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $phone);
-            $variations = [$cleanPhone];
-            if (str_starts_with($cleanPhone, '0')) {
-                $variations[] = '62' . substr($cleanPhone, 1);
-            } elseif (str_starts_with($cleanPhone, '62')) {
-                $variations[] = '0' . substr($cleanPhone, 2);
-            }
-            $userIds = UserProfile::whereIn('phone_number', $variations)->pluck('user_id')->filter();
-            $query->where(function ($q) use ($userIds, $cleanPhone) {
-                if ($userIds->isNotEmpty()) {
-                    $q->whereIn('user_id', $userIds);
-                }
-                $q->orWhere('shipping_address_snapshot->phone', 'like', "%{$cleanPhone}%");
-            });
-        } else {
-            return response()->json([
-                'success' => true,
-                'data' => [],
-            ]);
-        }
 
         if ($status = $request->input('status')) {
             $query->where('order_status', $status);
@@ -216,66 +200,38 @@ class OrderController extends Controller
         ]);
 
         try {
-            // 1. Tentukan Customer User (dari Token Auth atau Buat/Temukan profil nomor HP)
+            // 1. Wajib Customer User terautentikasi (mencegah pembuatan user spam & pencurian poin loyalty via nomor HP)
             $user = $request->user();
-
             if (!$user) {
-                $shipping = $validated['shipping_address'];
-                $cleanPhone = preg_replace('/[^0-9]/', '', (string) ($shipping['phone'] ?? ''));
-
-                if (empty($cleanPhone) || strlen($cleanPhone) < 9) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Nomor HP pelanggan tidak valid (minimal 9 digit).',
-                    ], 422);
-                }
-
-                // Cek variasi awalan 0 / 62
-                $phoneVariations = [$cleanPhone];
-                if (str_starts_with($cleanPhone, '0')) {
-                    $phoneVariations[] = '62' . substr($cleanPhone, 1);
-                } elseif (str_starts_with($cleanPhone, '62')) {
-                    $phoneVariations[] = '0' . substr($cleanPhone, 2);
-                }
-
-                $existingProfile = UserProfile::whereIn('phone_number', $phoneVariations)->first();
-
-                if ($existingProfile && $existingProfile->user) {
-                    $user = $existingProfile->user;
-                } else {
-                    $customerName = trim($shipping['name'] ?: 'Pelanggan Mobile');
-                    $existingUser = User::where('email', $cleanPhone . '@tokopon.internal')->first();
-
-                    if ($existingUser) {
-                        $user = $existingUser;
-                        if (!$user->profile) {
-                            UserProfile::create([
-                                'user_id' => $user->id,
-                                'full_name' => $customerName,
-                                'phone_number' => $cleanPhone,
-                                'address' => $shipping['address'] ?? null,
-                            ]);
-                        }
-                    } else {
-                        $user = User::create([
-                            'name' => $customerName,
-                            'email' => $cleanPhone . '@tokopon.internal',
-                            'password' => bcrypt(Str::random(20)),
-                        ]);
-
-                        UserProfile::create([
-                            'user_id' => $user->id,
-                            'full_name' => $customerName,
-                            'phone_number' => $cleanPhone,
-                            'address' => $shipping['address'] ?? null,
-                        ]);
-
-                        if (Role::where('name', 'customer')->exists()) {
-                            $user->assignRole('customer');
-                        }
-                    }
-                }
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu untuk melakukan checkout.',
+                ], 401);
             }
+
+            // 1.1 Anti-XSS: Tolak tag HTML / payload skrip pada nama penerima, alamat, kota, dan catatan
+            $shipping = $validated['shipping_address'];
+            if (
+                InputSanitizer::containsHtmlOrScript($shipping['name'] ?? null)
+                || InputSanitizer::containsHtmlOrScript($shipping['address'] ?? null)
+                || InputSanitizer::containsHtmlOrScript($shipping['city'] ?? null)
+                || InputSanitizer::containsHtmlOrScript($validated['notes'] ?? null)
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nama, alamat, atau catatan tidak boleh mengandung tag HTML atau skrip berbahaya.',
+                ], 422);
+            }
+
+            $sanitizedShipping = [
+                'name' => InputSanitizer::cleanPlainText($shipping['name'] ?? $user->name, 120),
+                'phone' => preg_replace('/[^0-9+]/', '', (string) ($shipping['phone'] ?? '')),
+                'address' => InputSanitizer::cleanPlainText($shipping['address'] ?? '', 500),
+                'city' => InputSanitizer::cleanPlainText($shipping['city'] ?? 'Indonesia', 100),
+            ];
+            $sanitizedNotes = isset($validated['notes'])
+                ? (InputSanitizer::cleanPlainText($validated['notes'], 500) ?: null)
+                : null;
 
             // 2. Siapkan payload checkout untuk MobileOrderService
             $rawFulfillment = strtoupper((string) ($validated['fulfillment_type'] ?? 'DELIVERY'));
@@ -294,8 +250,8 @@ class OrderController extends Controller
                 'shipping_cost' => $validated['shipping_cost'] ?? 0,
                 'redeem_points' => (int) ($validated['redeem_points'] ?? 0),
                 'coupon_code' => $validated['coupon_code'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'shipping_address_snapshot' => $validated['shipping_address'],
+                'notes' => $sanitizedNotes,
+                'shipping_address_snapshot' => $sanitizedShipping,
                 'expiry_minutes' => 60, // Batas waktu 60 menit
             ];
 
@@ -354,9 +310,9 @@ class OrderController extends Controller
     }
 
     /**
-     * Mengambil informasi detail pesanan berdasarkan nomor order.
+     * Mengambil informasi detail pesanan berdasarkan nomor order (Anti-IDOR: wajib milik user login atau staf/admin).
      */
-    public function show(string $orderNumber): JsonResponse
+    public function show(Request $request, string $orderNumber): JsonResponse
     {
         $order = Order::where('order_number', $orderNumber)
             ->with(['items.variant', 'payments.paymentMethod', 'payments.media', 'warehouse', 'pickupWarehouse', 'shipping'])
@@ -367,6 +323,10 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => "Pesanan dengan nomor {$orderNumber} tidak ditemukan.",
             ], 404);
+        }
+
+        if ($denied = $this->checkOrderOwnership($request, $order)) {
+            return $denied;
         }
 
         $latestPayment = $order->payments->last();
@@ -484,6 +444,10 @@ class OrderController extends Controller
             ], 404);
         }
 
+        if ($denied = $this->checkOrderOwnership($request, $order)) {
+            return $denied;
+        }
+
         try {
             $updatedOrder = $this->orderService->uploadPaymentProof(
                 $order,
@@ -525,15 +489,11 @@ class OrderController extends Controller
             ], 404);
         }
 
-        $user = $request->user();
-
-        // Verifikasi kepemilikan pesanan jika request terautentikasi (customer tidak boleh membatalkan pesanan user lain)
-        if ($user && $order->user_id && (int) $order->user_id !== (int) $user->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki hak akses untuk membatalkan pesanan ini.',
-            ], 403);
+        if ($denied = $this->checkOrderOwnership($request, $order)) {
+            return $denied;
         }
+
+        $user = $request->user();
 
         if ($order->order_status !== 'WAITING_PAYMENT') {
             return response()->json([
@@ -561,5 +521,32 @@ class OrderController extends Controller
                 'message' => 'Gagal membatalkan pesanan: ' . $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Verifikasi kepemilikan order (Anti-IDOR): wajib login dan milik user tersebut (kecuali admin/staf CS).
+     */
+    protected function checkOrderOwnership(Request $request, Order $order): ?JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan login terlebih dahulu untuk mengakses pesanan ini.',
+            ], 401);
+        }
+
+        $isOwner = $order->user_id !== null && (int) $order->user_id === (int) $user->id;
+        $isStaff = method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['superadmin', 'admin', 'director', 'manager', 'cs']);
+
+        if (!$isOwner && !$isStaff) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses ke pesanan ini.',
+            ], 403);
+        }
+
+        return null;
     }
 }

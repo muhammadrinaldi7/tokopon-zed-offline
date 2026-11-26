@@ -8,6 +8,7 @@ use App\Models\ReferralCommission;
 use App\Models\User;
 use App\Models\UserProfile;
 use App\Models\UserReferralCode;
+use App\Support\InputSanitizer;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -130,7 +131,19 @@ class ReferralService
             throw new Exception("Format email tidak valid.");
         }
 
-        $name = trim((string) ($payload['name'] ?? 'Pelanggan'));
+        $rawName = (string) ($payload['name'] ?? 'Pelanggan');
+        if (InputSanitizer::containsHtmlOrScript($rawName)) {
+            throw new Exception("Nama tidak boleh mengandung tag HTML atau karakter berbahaya.");
+        }
+        $name = InputSanitizer::cleanPlainText($rawName, 120);
+        if ($name === '') {
+            throw new Exception("Nama lengkap tidak valid.");
+        }
+        $cleanAddress = isset($payload['address'])
+            ? (InputSanitizer::cleanPlainText((string) $payload['address'], 500) ?: null)
+            : null;
+        $payload['address'] = $cleanAddress;
+
         $password = (string) ($payload['password'] ?? '');
         if (strlen($password) < 6) {
             throw new Exception("Kata sandi minimal 6 karakter.");
@@ -162,11 +175,38 @@ class ReferralService
 
             $existingUser = $existingProfile?->user;
 
-            // KASUS 1: Member POS Eksisting (Klaim Akun Pertama Kali di Mobile)
+            // KASUS 1: Member POS Eksisting — PROTEKSI ACCOUNT TAKEOVER (ATO)
             if ($existingUser) {
-                // Cek apakah sudah pernah aktif di mobile app
+                // 1. BLOKIR TOTAL klaim terhadap akun internal/staf/admin!
+                $protectedRoles = [
+                    'superadmin', 'admin', 'director', 'owner', 'manager',
+                    'cs', 'kasir', 'kasir_sju', 'cashier', 'staff', 'finance', 'gudang', 'warehouse',
+                ];
+                if (method_exists($existingUser, 'hasAnyRole') && $existingUser->hasAnyRole($protectedRoles)) {
+                    Log::warning("Percobaan klaim akun internal/staf via /auth/register ditolak.", [
+                        'target_user_id' => $existingUser->id,
+                        'phone' => $cleanPhone,
+                    ]);
+                    throw new Exception("Nomor WhatsApp ini tidak dapat didaftarkan melalui registrasi mandiri.");
+                }
+
+                // 2. Cek apakah sudah pernah aktif di mobile app
                 if ($existingUser->mobile_activated_at !== null) {
                     throw new Exception("Nomor WhatsApp ini sudah aktif di Tokopon Mobile. Silakan langsung masuk (login).");
+                }
+
+                // 3. Wajibkan verifikasi OTP sebelum boleh menimpa email/password akun member POS eksisting
+                // (mencegah siapa pun mengambil alih akun & poin pelanggan lain hanya bermodal nomor HP)
+                $allowUnverifiedClaim = filter_var(
+                    $this->settingService->get('mobile_allow_unverified_pos_claim', false),
+                    FILTER_VALIDATE_BOOLEAN
+                );
+                if (!$allowUnverifiedClaim) {
+                    Log::warning("Klaim member POS tanpa OTP ditolak untuk mencegah Account Takeover.", [
+                        'target_user_id' => $existingUser->id,
+                        'phone' => $cleanPhone,
+                    ]);
+                    throw new Exception("Nomor WhatsApp sudah terdaftar sebagai member toko. Demi keamanan akun, silakan login atau hubungi CS untuk aktivasi terverifikasi.");
                 }
 
                 // Cek apakah email baru bentrok dengan user lain

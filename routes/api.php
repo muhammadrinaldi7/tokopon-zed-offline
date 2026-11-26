@@ -12,16 +12,18 @@ Route::post('/user/push-token', [\App\Http\Controllers\Api\Mobile\AuthController
     ->middleware('auth:sanctum')
     ->name('api.user.push-token');
 
-// Chat Init root alias
+// Chat Init root alias (rate-limited)
 Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+    ->middleware('throttle:20,1,mobile_chat_init')
     ->name('api.chat.init');
 
 // Xendit Webhooks
 Route::post('/webhooks/xendit/invoice', [\App\Http\Controllers\Api\XenditWebhookController::class, 'handleInvoiceCallback'])
     ->name('api.webhooks.xendit.invoice');
 
-// Accurate API Sync
+// Accurate API Sync (Wajib Auth Sanctum + Admin/Superadmin)
 Route::get('/accurate/import-items', [\App\Http\Controllers\Api\AccurateImportController::class, 'importItems'])
+    ->middleware(['auth:sanctum', 'role:superadmin|admin'])
     ->name('api.accurate.import-items');
 
 Route::post('/webhooks/accurate', [\App\Http\Controllers\Api\AccurateWebhookController::class, 'handle'])
@@ -32,22 +34,25 @@ Route::post('/webhooks/approval', [\App\Http\Controllers\ApprovalController::cla
     ->name('api.webhooks.approval');
 
 // ============================================
-// API UNTUK QZ PRINT SIGNATURE (Self-Signed)
+// API UNTUK QZ PRINT SIGNATURE (Wajib Auth Staf/Admin)
 // ============================================
 Route::post('/sign-qz', function (Request $request) {
-    $toSign = $request->input('request');
+    $toSign = (string) $request->input('request', '');
+    if ($toSign === '' || strlen($toSign) > 4096) {
+        return response()->json(['message' => 'Payload tanda tangan tidak valid.'], 422);
+    }
 
-    // Ambil private key yang sudah di-generate sebelumnya
-    // Pastikan path ini sesuai dengan lokasi penyimpanan private-key.pem Anda
-    $privateKey = file_get_contents(storage_path('app/private-key.pem'));
+    $keyPath = storage_path('app/private-key.pem');
+    if (!is_file($keyPath)) {
+        return response()->json(['message' => 'Private key QZ tidak ditemukan.'], 500);
+    }
 
+    $privateKey = file_get_contents($keyPath);
     $signature = '';
-    // Sign request dengan SHA512
     openssl_sign($toSign, $signature, $privateKey, OPENSSL_ALGO_SHA512);
 
-    // Kembalikan ke frontend dalam format base64
     return base64_encode($signature);
-});
+})->middleware(['auth:sanctum', 'role:superadmin|admin|kasir|kasir_sju|cashier|staff']);
 
 // ============================================
 // PUBLIC READ-ONLY TRADE-IN & PRICING API
@@ -166,10 +171,12 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::get('/config', [\App\Http\Controllers\Api\Mobile\ConfigController::class, 'index'])
         ->name('api.mobile.config');
 
-    // 0.1 Autentikasi Pengguna Mobile App
+    // 0.1 Autentikasi Pengguna Mobile App (Rate Limit Ketat Anti Brute-Force & Spam)
     Route::post('/auth/login', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'login'])
+        ->middleware('throttle:10,1,mobile_login')
         ->name('api.mobile.auth.login');
     Route::post('/auth/register', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'register'])
+        ->middleware('throttle:5,1,mobile_register')
         ->name('api.mobile.auth.register');
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -215,32 +222,39 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])
         ->name('api.mobile.payment-methods.index');
 
-    // 4. Transaksi & Checkout Pesanan
-    Route::get('/orders', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'index'])
-        ->name('api.mobile.orders.index');
-    Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
-        ->name('api.mobile.orders.checkout');
-    Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])
-        ->name('api.mobile.orders.show');
-    Route::post('/orders/{orderNumber}/upload-proof', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'uploadProof'])
-        ->name('api.mobile.orders.upload-proof');
-    Route::post('/orders/{orderNumber}/cancel', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'cancel'])
-        ->name('api.mobile.orders.cancel');
+    // 4. Transaksi & Checkout Pesanan (Wajib Auth Sanctum — Anti IDOR & Anti Kuras Poin)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/orders', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'index'])
+            ->name('api.mobile.orders.index');
+        Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
+            ->middleware('throttle:15,1,mobile_checkout')
+            ->name('api.mobile.orders.checkout');
+        Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])
+            ->name('api.mobile.orders.show');
+        Route::post('/orders/{orderNumber}/upload-proof', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'uploadProof'])
+            ->middleware('throttle:15,1,mobile_upload_proof')
+            ->name('api.mobile.orders.upload-proof');
+        Route::post('/orders/{orderNumber}/cancel', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'cancel'])
+            ->middleware('throttle:15,1,mobile_order_cancel')
+            ->name('api.mobile.orders.cancel');
+    });
 
-    // 5. Realtime Chat (Customer & Guest)
+    // 5. Realtime Chat (Customer Login & Guest dengan Server-Generated Token)
     Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+        ->middleware('throttle:20,1,mobile_chat_init')
         ->name('api.mobile.chat.init');
     Route::get('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'getMessages'])
         ->name('api.mobile.chat.messages');
     Route::post('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'sendMessage'])
+        ->middleware('throttle:30,1,mobile_chat_send')
         ->name('api.mobile.chat.send');
     Route::post('/chat/conversations/{conversationId}/read', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'markAsRead'])
         ->name('api.mobile.chat.read');
     Route::post('/broadcasting/auth', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'broadcastAuth'])
         ->name('api.mobile.broadcasting.auth');
 
-    // 6. Loyalty & Membership Poin
-    Route::prefix('loyalty')->name('api.mobile.loyalty.')->group(function () {
+    // 6. Loyalty & Membership Poin (Wajib Auth Sanctum — Anti IDOR)
+    Route::middleware('auth:sanctum')->prefix('loyalty')->name('api.mobile.loyalty.')->group(function () {
         Route::get('/summary', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'summary'])
             ->name('summary');
         Route::get('/history', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'history'])

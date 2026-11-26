@@ -145,21 +145,14 @@ class LoyaltyController extends Controller
     }
 
     /**
-     * Tentukan nomor HP pelanggan dari token autentikasi atau header request.
+     * Tentukan nomor HP pelanggan HANYA dari pengguna yang terautentikasi (Anti-IDOR).
      */
     protected function resolveCustomerPhone(Request $request): ?string
     {
         $user = $request->user();
 
-        // 1. Dari data terautentikasi (memeriksa profil, loyalty account, dan email internal)
         if ($user && !empty($user->customer_phone)) {
             return $user->customer_phone;
-        }
-
-        // 2. Dari parameter query / header
-        $phoneParam = $request->query('phone') ?? $request->header('X-Customer-Phone');
-        if (!empty($phoneParam)) {
-            return (string) $phoneParam;
         }
 
         return null;

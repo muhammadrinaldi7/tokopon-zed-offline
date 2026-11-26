@@ -173,9 +173,10 @@ class ApprovalController extends Controller
      */
     public function apiProcess(Request $request)
     {
-        // 1. VALIDASI KEAMANAN API
-        $secretKey = env('N8N_API_SECRET', 'ZedposRahasia123');
-        if ($request->header('X-API-KEY') !== $secretKey) {
+        // 1. VALIDASI KEAMANAN API (timing-safe)
+        $secretKey = (string) env('N8N_API_SECRET', 'ZedposRahasia123');
+        $incomingKey = (string) $request->header('X-API-KEY', '');
+        if ($secretKey === '' || $incomingKey === '' || !hash_equals($secretKey, $incomingKey)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized Access'], 401);
         }
 
