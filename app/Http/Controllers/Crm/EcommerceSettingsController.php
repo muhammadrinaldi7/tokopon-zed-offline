@@ -60,8 +60,50 @@ class EcommerceSettingsController extends Controller
                     'referral_hold_days' => (int) $settingService->get('referral_hold_days', 7),
                     'referral_min_withdrawal' => (float) $settingService->get('referral_min_withdrawal', 50000),
                 ];
+
+                $normalizeProyek = function ($raw) {
+                    if (is_string($raw)) {
+                        $decoded = json_decode($raw, true);
+                        $raw = is_array($decoded) ? $decoded : explode(',', $raw);
+                    }
+                    if (!is_array($raw)) {
+                        return [];
+                    }
+                    return array_values(array_unique(array_filter(
+                        array_map(fn($p) => strtoupper(trim((string) $p)), $raw),
+                        fn($p) => $p !== ''
+                    )));
+                };
+
+                $savedOldBuIds = $settingService->get('tradein_old_business_unit_ids', [2]);
+                if (is_string($savedOldBuIds)) {
+                    $decodedBu = json_decode($savedOldBuIds, true);
+                    $savedOldBuIds = is_array($decodedBu) ? $decodedBu : explode(',', $savedOldBuIds);
+                }
+                $oldBuIds = is_array($savedOldBuIds)
+                    ? array_values(array_unique(array_filter(array_map('intval', $savedOldBuIds), fn($id) => $id > 0)))
+                    : [2];
+                if (empty($oldBuIds)) {
+                    $oldBuIds = [2];
+                }
+
+                $tradeInSettings = [
+                    'tradein_old_business_unit_ids' => $oldBuIds,
+                    'tradein_old_price_source' => (string) $settingService->get('tradein_old_price_source', 'buy_fallback'),
+                    'tradein_old_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_old_allowed_proyeks', [])),
+                    'tradein_target_new_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_target_new_allowed_proyeks', [])),
+                    'tradein_target_second_allowed_proyeks' => $normalizeProyek($settingService->get('tradein_target_second_allowed_proyeks', [])),
+                    'tradein_group_old_devices' => filter_var($settingService->get('tradein_group_old_devices', true), FILTER_VALIDATE_BOOLEAN),
+                    'tradein_group_target_devices' => filter_var($settingService->get('tradein_group_target_devices', true), FILTER_VALIDATE_BOOLEAN),
+                    'tradein_second_price_source' => (string) $settingService->get('tradein_second_price_source', 'custom_fallback'),
+                    'tradein_second_accurate_markup_percent' => (float) $settingService->get('tradein_second_accurate_markup_percent', 0),
+                    'tradein_second_accurate_rounding' => (int) $settingService->get('tradein_second_accurate_rounding', 0),
+                    'tradein_old_price_strategy' => (string) $settingService->get('tradein_old_price_strategy', 'min'),
+                    'tradein_target_price_strategy' => (string) $settingService->get('tradein_target_price_strategy', 'min'),
+                    'tradein_exclude_accessories' => filter_var($settingService->get('tradein_exclude_accessories', true), FILTER_VALIDATE_BOOLEAN),
+                ];
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load global/referral settings: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load global/referral/tradein settings: ' . $e->getMessage());
                 $globalSettings = [
                     'dynamic_shipping' => false,
                     'instant_payment' => false,
@@ -75,6 +117,21 @@ class EcommerceSettingsController extends Controller
                     'referral_max_commission_cap' => 100000,
                     'referral_hold_days' => 7,
                     'referral_min_withdrawal' => 50000,
+                ];
+                $tradeInSettings = [
+                    'tradein_old_business_unit_ids' => [2],
+                    'tradein_old_price_source' => 'buy_fallback',
+                    'tradein_old_allowed_proyeks' => [],
+                    'tradein_target_new_allowed_proyeks' => [],
+                    'tradein_target_second_allowed_proyeks' => [],
+                    'tradein_group_old_devices' => true,
+                    'tradein_group_target_devices' => true,
+                    'tradein_second_price_source' => 'custom_fallback',
+                    'tradein_second_accurate_markup_percent' => 0,
+                    'tradein_second_accurate_rounding' => 0,
+                    'tradein_old_price_strategy' => 'min',
+                    'tradein_target_price_strategy' => 'min',
+                    'tradein_exclude_accessories' => true,
                 ];
             }
 
@@ -287,9 +344,33 @@ class EcommerceSettingsController extends Controller
                 \Illuminate\Support\Facades\Log::warning('Settings: Failed to load users: ' . $e->getMessage());
             }
 
+            // 6. Daftar Proyek unik untuk Filter Proyek API Trade-In
+            $availableProyeks = ['INTER', 'NON-PROYEK', 'RESMI'];
+            try {
+                if (Schema::hasTable('product_accurates') && Schema::hasColumn('product_accurates', 'proyek')) {
+                    $dbProyeks = ProductAccurate::query()
+                        ->selectRaw("DISTINCT UPPER(TRIM(COALESCE(proyek, ''))) as norm_proyek")
+                        ->pluck('norm_proyek')
+                        ->map(fn($p) => ($p === '' || $p === 'NON-PROYEK') ? 'NON-PROYEK' : $cleanUtf8($p))
+                        ->reject(fn($p) => $p === 'ACCESSORIES')
+                        ->unique()
+                        ->values()
+                        ->all();
+                    $availableProyeks = collect(array_merge(['RESMI', 'INTER', 'NON-PROYEK'], $dbProyeks))
+                        ->unique()
+                        ->sort()
+                        ->values()
+                        ->all();
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load proyeks: ' . $e->getMessage());
+            }
+
             return Inertia::render('Settings/Index', [
                 'globalSettings' => $globalSettings,
                 'referralSettings' => $referralSettings,
+                'tradeInSettings' => $tradeInSettings,
+                'availableProyeks' => $availableProyeks,
                 'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
                 'buSettings' => [
                     'online_warehouse_id' => $onlineWarehouseId ? (int) $onlineWarehouseId : null,
@@ -322,6 +403,22 @@ class EcommerceSettingsController extends Controller
                     'referral_hold_days' => 7,
                     'referral_min_withdrawal' => 50000,
                 ],
+                'tradeInSettings' => [
+                    'tradein_old_business_unit_ids' => [2],
+                    'tradein_old_price_source' => 'buy_fallback',
+                    'tradein_old_allowed_proyeks' => [],
+                    'tradein_target_new_allowed_proyeks' => [],
+                    'tradein_target_second_allowed_proyeks' => [],
+                    'tradein_group_old_devices' => true,
+                    'tradein_group_target_devices' => true,
+                    'tradein_second_price_source' => 'custom_fallback',
+                    'tradein_second_accurate_markup_percent' => 0,
+                    'tradein_second_accurate_rounding' => 0,
+                    'tradein_old_price_strategy' => 'min',
+                    'tradein_target_price_strategy' => 'min',
+                    'tradein_exclude_accessories' => true,
+                ],
+                'availableProyeks' => ['INTER', 'NON-PROYEK', 'RESMI'],
                 'selectedBuId' => null,
                 'buSettings' => [
                     'online_warehouse_id' => null,
@@ -451,5 +548,60 @@ class EcommerceSettingsController extends Controller
         $settingService->set('referral_min_withdrawal', (string) $validated['referral_min_withdrawal']);
 
         return redirect()->back()->with('success', 'Pengaturan program referral & komisi berhasil disimpan.');
+    }
+
+    /**
+     * Simpan pengaturan dinamis API Trade-In & Up Harga Jual Accurate dari halaman Pengaturan CRM
+     */
+    public function saveTradeInSettings(Request $request, SettingService $settingService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tradein_old_business_unit_ids' => 'required|array|min:1',
+            'tradein_old_business_unit_ids.*' => 'integer|exists:business_units,id',
+            'tradein_old_price_source' => 'required|in:buy_fallback,buy_only',
+            'tradein_old_allowed_proyeks' => 'nullable|array',
+            'tradein_old_allowed_proyeks.*' => 'string|max:50',
+            'tradein_target_new_allowed_proyeks' => 'nullable|array',
+            'tradein_target_new_allowed_proyeks.*' => 'string|max:50',
+            'tradein_target_second_allowed_proyeks' => 'nullable|array',
+            'tradein_target_second_allowed_proyeks.*' => 'string|max:50',
+            'tradein_group_old_devices' => 'boolean',
+            'tradein_group_target_devices' => 'boolean',
+            'tradein_second_price_source' => 'required|in:custom_fallback,custom_only,accurate_only',
+            'tradein_second_accurate_markup_percent' => 'required|numeric|min:0|max:200',
+            'tradein_second_accurate_rounding' => 'required|integer|in:0,1000,10000,50000,100000',
+            'tradein_old_price_strategy' => 'required|in:min,max',
+            'tradein_target_price_strategy' => 'required|in:min,max',
+            'tradein_exclude_accessories' => 'boolean',
+        ], [
+            'tradein_old_business_unit_ids.required' => 'Pilih minimal 1 Business Unit sebagai acuan daftar HP Lama.',
+            'tradein_old_business_unit_ids.min' => 'Pilih minimal 1 Business Unit sebagai acuan daftar HP Lama.',
+        ]);
+
+        $normalizeList = fn(array $list) => array_values(array_unique(array_filter(
+            array_map(fn($p) => strtoupper(trim((string) $p)), $list),
+            fn($p) => $p !== ''
+        )));
+
+        $oldBuIds = array_values(array_unique(array_filter(
+            array_map('intval', $validated['tradein_old_business_unit_ids']),
+            fn($id) => $id > 0
+        )));
+
+        $settingService->set('tradein_old_business_unit_ids', $oldBuIds, 'json');
+        $settingService->set('tradein_old_price_source', $validated['tradein_old_price_source'], 'string');
+        $settingService->set('tradein_old_allowed_proyeks', $normalizeList($validated['tradein_old_allowed_proyeks'] ?? []), 'json');
+        $settingService->set('tradein_target_new_allowed_proyeks', $normalizeList($validated['tradein_target_new_allowed_proyeks'] ?? []), 'json');
+        $settingService->set('tradein_target_second_allowed_proyeks', $normalizeList($validated['tradein_target_second_allowed_proyeks'] ?? []), 'json');
+        $settingService->set('tradein_group_old_devices', !empty($validated['tradein_group_old_devices']), 'boolean');
+        $settingService->set('tradein_group_target_devices', !empty($validated['tradein_group_target_devices']), 'boolean');
+        $settingService->set('tradein_second_price_source', $validated['tradein_second_price_source'], 'string');
+        $settingService->set('tradein_second_accurate_markup_percent', (float) $validated['tradein_second_accurate_markup_percent'], 'float');
+        $settingService->set('tradein_second_accurate_rounding', (int) $validated['tradein_second_accurate_rounding'], 'integer');
+        $settingService->set('tradein_old_price_strategy', $validated['tradein_old_price_strategy'], 'string');
+        $settingService->set('tradein_target_price_strategy', $validated['tradein_target_price_strategy'], 'string');
+        $settingService->set('tradein_exclude_accessories', !empty($validated['tradein_exclude_accessories']), 'boolean');
+
+        return redirect()->back()->with('success', 'Pengaturan API Trade-In & Up Harga Accurate berhasil disimpan.');
     }
 }

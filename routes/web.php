@@ -179,6 +179,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/settings/global', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveGlobalSettings'])->name('settings.global');
         Route::post('/settings/business-unit', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveBusinessUnitSettings'])->name('settings.business-unit');
         Route::post('/settings/referral', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveReferralSettings'])->name('settings.referral');
+        Route::post('/settings/trade-in', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveTradeInSettings'])->name('settings.trade-in');
     });
 
     // Reporting
