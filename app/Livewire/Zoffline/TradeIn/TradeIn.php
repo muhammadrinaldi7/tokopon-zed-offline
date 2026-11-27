@@ -232,7 +232,7 @@ class TradeIn extends Component
             if ($this->isNewCustomer) {
                 $rules['name']        = 'required|string|max:255';
                 $rules['mobilePhone'] = 'required|string|max:15';
-                $rules['email']       = 'required|email|unique:users,email';
+                $rules['email']       = 'required|email:rfc,filter|unique:users,email';
                 $rules['nik']         = 'required|numeric|digits:16|unique:users,nik';
                 $rules['npwp']        = 'nullable|string|max:20';
                 $rules['foto_ktp']    = 'required|image|max:2048';
@@ -281,6 +281,7 @@ class TradeIn extends Component
         'name.required'       => 'Nama lengkap wajib diisi.',
         'mobilePhone.required' => 'Nomor HP wajib diisi.',
         'email.required'      => 'Email wajib diisi.',
+        'email.email'         => 'Format email tidak valid (wajib menggunakan domain lengkap, contoh: nama@gmail.com).',
         'email.unique'        => 'Email sudah terdaftar di sistem.',
         'nik.required'        => 'NIK wajib diisi.',
         'nik.digits'          => 'NIK harus tepat 16 digit.',

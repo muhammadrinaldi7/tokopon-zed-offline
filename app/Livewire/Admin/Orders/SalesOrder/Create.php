@@ -573,15 +573,19 @@ class Create extends Component
 
     public function createNewCustomer()
     {
+        $this->new_customer_email = trim((string) $this->new_customer_email);
+
         $this->validate([
             'new_customer_name' => 'required|string|min:3',
             'new_customer_phone' => 'required|string|min:9',
+            'new_customer_email' => 'nullable|email:rfc,filter',
         ], [
             'new_customer_name.required' => 'Nama wajib diisi',
             'new_customer_phone.required' => 'No HP wajib diisi',
+            'new_customer_email.email' => 'Format email tidak valid (wajib menggunakan domain lengkap, contoh: nama@gmail.com).',
         ]);
 
-        $email = $this->new_customer_email;
+        $email = strtolower($this->new_customer_email);
         if (empty($email)) {
             // Gunakan rand agar email generated selalu unik (mirip dengan logic di POS)
             $email = preg_replace('/[^0-9]/', '', $this->new_customer_phone) . rand(1000, 9999) . '@zpos.com';

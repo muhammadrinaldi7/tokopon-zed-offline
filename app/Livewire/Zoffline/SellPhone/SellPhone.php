@@ -939,9 +939,9 @@ class SellPhone extends Component
             ];
 
             if ($this->existingUserId) {
-                $rules['email'] = 'required|email|unique:users,email,' . $this->existingUserId;
+                $rules['email'] = 'required|email:rfc,filter|unique:users,email,' . $this->existingUserId;
             } else {
-                $rules['email'] = 'required|email|unique:users,email';
+                $rules['email'] = 'required|email:rfc,filter|unique:users,email';
             }
 
             $rules['domisili']       = 'required|string|max:500';
@@ -1018,6 +1018,7 @@ class SellPhone extends Component
         'name.required'       => 'Nama lengkap wajib diisi.',
         'mobilePhone.required' => 'Nomor HP wajib diisi.',
         'email.required'      => 'Email wajib diisi.',
+        'email.email'         => 'Format email tidak valid (wajib menggunakan domain lengkap, contoh: nama@gmail.com).',
         'email.unique'        => 'Email sudah terdaftar di sistem.',
         'domisili.required'   => 'Domisili wajib diisi.',
         'account_number.required' => 'Nomor Rekening wajib diisi.',
