@@ -199,6 +199,28 @@ class AccurateService
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
                 $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                // Self-healing: Jika vendor sudah ada di Accurate, tarik detailnya lalu simpan ke user_accurate_vendors
+                if (
+                    stripos($errorMsg, 'sudah ada') !== false ||
+                    stripos($errorMsg, 'already exist') !== false ||
+                    stripos($errorMsg, 'terdaftar') !== false ||
+                    stripos($errorMsg, 'duplicate') !== false
+                ) {
+                    try {
+                        $existing = $this->getVendorDetail($vendorData['vendorNo'], $databaseSource);
+                        if (!empty($existing['id'])) {
+                            return $user->accurateVendors()->updateOrCreate(
+                                ['business_unit_id' => $bu->id],
+                                [
+                                    'accurate_vendor_id' => $existing['id'],
+                                    'accurate_vendor_no' => $existing['vendorNo'] ?? $vendorData['vendorNo'],
+                                ]
+                            );
+                        }
+                    } catch (\Throwable $lookupEx) {
+                        Log::warning("Self-healing syncVendor gagal lookup {$vendorData['vendorNo']}: " . $lookupEx->getMessage());
+                    }
+                }
                 throw new \Exception('API Accurate Error: ' . $errorMsg);
             }
             // Simpan ID dari Accurate ke Database kita
@@ -570,15 +592,40 @@ class AccurateService
         if ($response->successful()) {
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
-                // If it already exists, Accurate usually returns an error. 
-                // We should handle if the error is "Customer No. already exists"
                 $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                // Self-healing: Jika nomor pelanggan sudah ada di Accurate (misal akibat retry/rollback),
+                // tarik detailnya dari Accurate lalu simpan otomatis ke user_accurate_customers.
+                if (
+                    stripos($errorMsg, 'sudah ada') !== false ||
+                    stripos($errorMsg, 'already exist') !== false ||
+                    stripos($errorMsg, 'terdaftar') !== false ||
+                    stripos($errorMsg, 'duplicate') !== false
+                ) {
+                    try {
+                        $existing = $this->getCustomerDetail($customerData['customerNo'], $databaseSource);
+                        if (!empty($existing['id'])) {
+                            Log::info("Self-healing syncCustomer: Menautkan customer yang sudah ada di Accurate ({$customerData['customerNo']} / ID {$existing['id']}) ke User #{$user->id}");
+                            return \App\Models\UserAccurateCustomer::updateOrCreate(
+                                [
+                                    'user_id' => $user->id,
+                                    'business_unit_id' => $businessUnit->id,
+                                ],
+                                [
+                                    'accurate_customer_id' => $existing['id'],
+                                    'accurate_customer_no' => $existing['customerNo'] ?? $customerData['customerNo'],
+                                ]
+                            );
+                        }
+                    } catch (\Throwable $lookupEx) {
+                        Log::warning("Self-healing syncCustomer gagal lookup {$customerData['customerNo']}: " . $lookupEx->getMessage());
+                    }
+                }
                 throw new \Exception('API Accurate Error: ' . $errorMsg);
             }
             if (isset($data['r'])) {
                 $result = $data['r'];
 
-                \App\Models\UserAccurateCustomer::updateOrCreate(
+                return \App\Models\UserAccurateCustomer::updateOrCreate(
                     [
                         'user_id' => $user->id,
                         'business_unit_id' => $businessUnit->id,
@@ -593,6 +640,60 @@ class AccurateService
             Log::info('API Accurate Customer Error: ' . $response->body());
             throw new \Exception('API Accurate Customer Error: ' . $response->body());
         }
+    }
+
+    /**
+     * Tarik detail Customer dari Accurate berdasarkan Nomor Pelanggan custom lalu tautkan ke User lokal.
+     */
+    public function pullAndLinkCustomerByNo(User $user, string $customerNo, string $databaseSource = 'syihab')
+    {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) {
+            throw new \Exception("Business Unit '{$databaseSource}' tidak ditemukan.");
+        }
+
+        $detail = $this->getCustomerDetail(trim($customerNo), $databaseSource);
+        if (empty($detail['id'])) {
+            throw new \Exception("Customer dengan nomor '{$customerNo}' tidak ditemukan di Accurate ({$businessUnit->name}).");
+        }
+
+        return \App\Models\UserAccurateCustomer::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'business_unit_id' => $businessUnit->id,
+            ],
+            [
+                'accurate_customer_id' => $detail['id'],
+                'accurate_customer_no' => $detail['customerNo'] ?? trim($customerNo),
+            ]
+        );
+    }
+
+    /**
+     * Tarik detail Vendor dari Accurate berdasarkan Nomor Pemasok custom lalu tautkan ke User lokal.
+     */
+    public function pullAndLinkVendorByNo(User $user, string $vendorNo, string $databaseSource = 'syihab')
+    {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) {
+            throw new \Exception("Business Unit '{$databaseSource}' tidak ditemukan.");
+        }
+
+        $detail = $this->getVendorDetail(trim($vendorNo), $databaseSource);
+        if (empty($detail['id'])) {
+            throw new \Exception("Vendor dengan nomor '{$vendorNo}' tidak ditemukan di Accurate ({$businessUnit->name}).");
+        }
+
+        return \App\Models\UserAccurateVendor::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'business_unit_id' => $businessUnit->id,
+            ],
+            [
+                'accurate_vendor_id' => $detail['id'],
+                'accurate_vendor_no' => $detail['vendorNo'] ?? trim($vendorNo),
+            ]
+        );
     }
 
     public function updateCustomer(User $user, $databaseSource = 'syihab')
