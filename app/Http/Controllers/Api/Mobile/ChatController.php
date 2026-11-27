@@ -148,6 +148,17 @@ class ChatController extends Controller
                     ->first();
             }
 
+            // Pengaman deduplikasi: jika guest_token kosong/baru tetapi perangkat mengirim push_token yang sama
+            // dan masih memiliki sesi guest open dalam 24 jam terakhir, reuse percakapan tersebut
+            if (!$conversation && !empty($pushToken)) {
+                $conversation = Conversation::where('push_token', $pushToken)
+                    ->whereNull('user_id')
+                    ->where('status', 'open')
+                    ->where('created_at', '>=', now()->subDay())
+                    ->latest()
+                    ->first();
+            }
+
             if (!$conversation) {
                 // Selalu generate token kriptografis acak di server (jangan pernah terima token buatan klien yang belum terdaftar)
                 $serverGuestToken = 'guest_' . bin2hex(random_bytes(24));
