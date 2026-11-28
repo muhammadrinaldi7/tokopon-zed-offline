@@ -343,8 +343,51 @@ export default function CsChatIndex({
         }
     };
 
+    // Buka peluang / transaksi baru secara eksplisit di room yang sama (Multi-Closing)
+    const handleCreateNewDeal = async () => {
+        if (!activeConv?.id) return;
+        setIsUpdatingStage(true);
+        try {
+            const res = await axios.post(`/crm/chat/${activeConv.id}/new-lead`);
+            if (res.data?.success && res.data.lead) {
+                const newLead = res.data.lead;
+                setActiveConv((prev) => ({
+                    ...prev,
+                    status: 'open',
+                    leadId: newLead.id,
+                    stageId: newLead.stageId,
+                    stageName: newLead.stageName,
+                    stageColor: newLead.stageColor,
+                    stageType: newLead.stageType,
+                    assignedToId: newLead.assignedToId,
+                    assignedToName: newLead.assignedToName,
+                    isAssignedToMe: newLead.isAssignedToMe,
+                }));
+                setConvList((prev) =>
+                    prev.map((c) =>
+                        c.id === activeConv.id
+                            ? {
+                                  ...c,
+                                  status: 'open',
+                                  leadId: newLead.id,
+                                  stageId: newLead.stageId,
+                                  stageName: newLead.stageName,
+                                  stageColor: newLead.stageColor,
+                                  stageType: newLead.stageType,
+                              }
+                            : c
+                    )
+                );
+            }
+        } catch (e) {
+            alert('Gagal membuka transaksi baru: ' + (e.response?.data?.message || e.message));
+        } finally {
+            setIsUpdatingStage(false);
+        }
+    };
+
     // Closing modal success callback
-    const handleClosingSuccess = (newStatus, newAmount) => {
+    const handleClosingSuccess = (newStatus, newAmount, responseData = null) => {
         const matchedStage =
             newStatus === 'deal'
                 ? pipelineStages.find((s) => s.stageType === 'won')
@@ -357,6 +400,14 @@ export default function CsChatIndex({
             ...prev,
             closingStatus: newStatus,
             closingAmount: newAmount,
+            ...(responseData?.wonCount !== undefined
+                ? {
+                      wonCount: responseData.wonCount,
+                      totalWonAmount: responseData.totalWonAmount,
+                      formattedTotalWonAmount: responseData.formattedTotalWonAmount,
+                      dealHistory: responseData.dealHistory || prev.dealHistory,
+                  }
+                : {}),
             ...(matchedStage
                 ? {
                       stageId: matchedStage.id,
@@ -463,6 +514,7 @@ export default function CsChatIndex({
                         onClaimToggle={handleClaimToggle}
                         pipelineStages={pipelineStages}
                         onQuickStageChange={handleQuickStageChange}
+                        onCreateNewDeal={handleCreateNewDeal}
                         isUpdatingStage={isUpdatingStage}
                         selectedProduct={selectedProduct}
                         onRemoveProduct={() => setSelectedProduct(null)}

@@ -9,6 +9,7 @@ use App\Models\CrmPipelineStage;
 use App\Models\Order;
 use App\Models\ProductAccurate;
 use App\Models\User;
+use App\Services\SettingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -206,12 +207,181 @@ class CrmPipelineService
     }
 
     /**
-     * Auto-Create atau sinkronisasi CrmLead dari sebuah Conversation
+     * Baca konfigurasi Smart Cooldown dinamis dari SettingService
+     */
+    public function getAutoReopenConfig(): array
+    {
+        try {
+            $settingService = app(SettingService::class);
+            $enabled = filter_var($settingService->get('crm_auto_reopen_after_won', true), FILTER_VALIDATE_BOOLEAN);
+            $cooldownMinutes = max(0, (int) $settingService->get('crm_repeat_lead_cooldown_minutes', 120));
+            $autoUnassign = filter_var($settingService->get('crm_auto_unassign_on_reopen', true), FILTER_VALIDATE_BOOLEAN);
+
+            return [
+                'enabled' => $enabled,
+                'cooldown_minutes' => $cooldownMinutes,
+                'auto_unassign' => $autoUnassign,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'enabled' => true,
+                'cooldown_minutes' => 120,
+                'auto_unassign' => true,
+            ];
+        }
+    }
+
+    /**
+     * Cari lead aktif (stage_type = open) terbaru milik percakapan ini
+     */
+    public function findActiveOpenLeadForConversation(int $conversationId): ?CrmLead
+    {
+        if (!Schema::hasTable('crm_leads') || !Schema::hasTable('crm_pipeline_stages')) {
+            return null;
+        }
+
+        return CrmLead::with('stage')
+            ->where('conversation_id', $conversationId)
+            ->whereHas('stage', fn ($q) => $q->where('stage_type', CrmPipelineStage::TYPE_OPEN))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Buat kartu peluang / transaksi BARU untuk percakapan yang sama (Multi-Closing tanpa menimpa WON sebelumnya)
+     */
+    public function createNewLeadForConversation(
+        Conversation $conv,
+        ?int $actorUserId = null,
+        array $overrides = []
+    ): CrmLead {
+        $this->ensureDefaultStagesExist();
+        $conv->loadMissing(['user.profile', 'productAccurate', 'businessUnit']);
+
+        $stage = !empty($overrides['stage_id'])
+            ? CrmPipelineStage::findOrFail($overrides['stage_id'])
+            : $this->getDefaultOpenStage();
+
+        $customerName = $conv->user?->name ?? ($conv->guest_name ?: 'Pengunjung Tokopon');
+        $customerPhone = $conv->guest_phone
+            ?: ($conv->user?->customer_phone ?? $conv->user?->profile?->phone_number ?? null);
+
+        $estimatedValue = array_key_exists('estimated_value', $overrides)
+            ? (float) $overrides['estimated_value']
+            : (float) ($conv->productAccurate?->base_price ?? 0);
+
+        $interestType = $overrides['interest_type'] ?? (
+            ($conv->productAccurate?->is_second || str_contains(strtoupper((string) ($conv->businessUnit?->name ?? '')), 'SECOND'))
+                ? 'second'
+                : 'new'
+        );
+
+        $assigneeId = array_key_exists('assigned_to_user_id', $overrides)
+            ? $overrides['assigned_to_user_id']
+            : ($actorUserId ?: $conv->assigned_to_user_id);
+
+        $lead = CrmLead::create([
+            'stage_id' => $stage->id,
+            'conversation_id' => $conv->id,
+            'user_id' => $conv->user_id,
+            'business_unit_id' => $overrides['business_unit_id'] ?? $conv->business_unit_id,
+            'assigned_to_user_id' => $assigneeId,
+            'product_accurate_id' => $overrides['product_accurate_id'] ?? $conv->product_accurate_id,
+            'customer_name' => $customerName,
+            'customer_phone' => $customerPhone,
+            'temperature' => $overrides['temperature'] ?? CrmLead::TEMP_WARM,
+            'interest_type' => $interestType,
+            'source' => $overrides['source'] ?? 'mobile_chat',
+            'estimated_value' => $estimatedValue,
+            'notes' => $overrides['notes'] ?? null,
+        ]);
+
+        // Pastikan status percakapan kembali open agar siap ditangani untuk transaksi baru
+        $convUpdates = ['status' => 'open'];
+        if (array_key_exists('assigned_to_user_id', $overrides)) {
+            $convUpdates['assigned_to_user_id'] = $overrides['assigned_to_user_id'];
+            $convUpdates['assigned_at'] = $overrides['assigned_to_user_id'] ? now() : null;
+        }
+        $conv->update($convUpdates);
+
+        CrmLeadActivity::create([
+            'lead_id' => $lead->id,
+            'actor_user_id' => $actorUserId,
+            'activity_type' => $overrides['activity_type'] ?? 'created',
+            'to_stage_id' => $stage->id,
+            'description' => $overrides['activity_description']
+                ?? "Peluang / transaksi baru (#{$lead->id}) dibuat pada percakapan #{$conv->id} di tahap {$stage->name}.",
+        ]);
+
+        return $lead->load('stage');
+    }
+
+    /**
+     * Auto-Spawn Peluang Baru ketika customer mengirim chat lagi setelah cooldown sejak WON/LOST
+     */
+    public function handleCustomerMessageForRepeatLead(Conversation $conv): ?CrmLead
+    {
+        if (!Schema::hasTable('crm_leads') || !Schema::hasTable('crm_pipeline_stages')) {
+            return null;
+        }
+
+        // Jika masih ada lead aktif (open), tidak perlu membuat lead baru
+        $openLead = $this->findActiveOpenLeadForConversation($conv->id);
+        if ($openLead) {
+            return null;
+        }
+
+        $latestLead = CrmLead::with('stage')
+            ->where('conversation_id', $conv->id)
+            ->latest('id')
+            ->first();
+
+        // Jika belum pernah ada lead sama sekali, buat lead pertama
+        if (!$latestLead) {
+            return $this->syncLeadFromConversation($conv);
+        }
+
+        // Jika lead terakhir sudah selesai (WON / LOST), cek pengaturan Smart Cooldown dinamis
+        if ($latestLead->stage && ($latestLead->stage->isWon() || $latestLead->stage->isLost())) {
+            $config = $this->getAutoReopenConfig();
+            if (!$config['enabled']) {
+                return null;
+            }
+
+            $closedAt = $latestLead->won_at ?? $latestLead->lost_at ?? $latestLead->updated_at;
+            $elapsedMinutes = $closedAt ? $closedAt->diffInMinutes(now()) : $config['cooldown_minutes'];
+
+            if ($elapsedMinutes >= $config['cooldown_minutes']) {
+                $overrides = [
+                    'activity_type' => 'created',
+                    'activity_description' => sprintf(
+                        'Auto-Spawn Peluang Baru: Customer menghubungi kembali setelah %d menit (batas cooldown: %d menit) sejak transaksi sebelumnya (%s).',
+                        $elapsedMinutes,
+                        $config['cooldown_minutes'],
+                        $latestLead->stage->name
+                    ),
+                ];
+
+                if ($config['auto_unassign']) {
+                    $overrides['assigned_to_user_id'] = null;
+                }
+
+                return $this->createNewLeadForConversation($conv, null, $overrides);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Auto-Create atau sinkronisasi CrmLead dari sebuah Conversation.
+     * Penting: Tidak pernah menimpa kartu WON/LOST sebelumnya. Jika $createIfClosed = true dan semua lead sudah tutup, buat lead baru!
      */
     public function syncLeadFromConversation(
         Conversation $conv,
         ?int $actorUserId = null,
-        bool $isBackfill = false
+        bool $isBackfill = false,
+        bool $createIfClosed = false
     ): ?CrmLead {
         if (!Schema::hasTable('crm_leads') || !Schema::hasTable('crm_pipeline_stages')) {
             return null;
@@ -220,7 +390,9 @@ class CrmPipelineService
         $this->ensureDefaultStagesExist();
         $conv->loadMissing(['user.profile', 'productAccurate', 'businessUnit']);
 
-        $existing = CrmLead::where('conversation_id', $conv->id)->latest('id')->first();
+        // Prioritaskan lead yang masih OPEN agar tidak menyentuh transaksi WON sebelumnya
+        $openLead = $this->findActiveOpenLeadForConversation($conv->id);
+        $latestLead = $openLead ?: CrmLead::with('stage')->where('conversation_id', $conv->id)->latest('id')->first();
 
         $customerName = $conv->user?->name ?? ($conv->guest_name ?: 'Pengunjung Tokopon');
         $customerPhone = $conv->guest_phone
@@ -232,33 +404,42 @@ class CrmPipelineService
             $interestType = 'second';
         }
 
-        if ($existing) {
+        if ($openLead) {
             $updates = [];
-            if ($customerName && $existing->customer_name !== $customerName) {
+            if ($customerName && $openLead->customer_name !== $customerName) {
                 $updates['customer_name'] = $customerName;
             }
-            if ($customerPhone && empty($existing->customer_phone)) {
+            if ($customerPhone && empty($openLead->customer_phone)) {
                 $updates['customer_phone'] = $customerPhone;
             }
-            if ($conv->user_id && !$existing->user_id) {
+            if ($conv->user_id && !$openLead->user_id) {
                 $updates['user_id'] = $conv->user_id;
             }
-            if ($conv->business_unit_id && !$existing->business_unit_id) {
+            if ($conv->business_unit_id && !$openLead->business_unit_id) {
                 $updates['business_unit_id'] = $conv->business_unit_id;
             }
-            if ($conv->assigned_to_user_id !== $existing->assigned_to_user_id) {
+            if ($conv->assigned_to_user_id !== $openLead->assigned_to_user_id) {
                 $updates['assigned_to_user_id'] = $conv->assigned_to_user_id;
             }
-            if ($conv->product_accurate_id && !$existing->product_accurate_id) {
+            if ($conv->product_accurate_id && !$openLead->product_accurate_id) {
                 $updates['product_accurate_id'] = $conv->product_accurate_id;
-                if ((float) $existing->estimated_value <= 0 && $estimatedValue > 0) {
+                if ((float) $openLead->estimated_value <= 0 && $estimatedValue > 0) {
                     $updates['estimated_value'] = $estimatedValue;
                 }
             }
             if (!empty($updates)) {
-                $existing->update($updates);
+                $openLead->update($updates);
             }
-            return $existing;
+            return $openLead;
+        }
+
+        // Jika semua lead sebelumnya sudah WON/LOST:
+        if ($latestLead) {
+            if ($createIfClosed) {
+                return $this->createNewLeadForConversation($conv, $actorUserId);
+            }
+            // Jangan pernah menimpa data transaksi WON/LOST yang sudah terkunci
+            return $latestLead;
         }
 
         // Tentukan tahap awal berdasarkan closing_status percakapan
@@ -269,12 +450,15 @@ class CrmPipelineService
             default => $this->getDefaultOpenStage(),
         };
 
+        $closerUserId = $conv->closed_by_user_id ?: $conv->assigned_to_user_id ?: $actorUserId;
+
         $lead = CrmLead::create([
             'stage_id' => $stage->id,
             'conversation_id' => $conv->id,
             'user_id' => $conv->user_id,
             'business_unit_id' => $conv->business_unit_id,
             'assigned_to_user_id' => $conv->assigned_to_user_id ?: $conv->closed_by_user_id,
+            'won_by_user_id' => $stage->isWon() ? $closerUserId : null,
             'product_accurate_id' => $conv->product_accurate_id,
             'customer_name' => $customerName,
             'customer_phone' => $customerPhone,
@@ -332,7 +516,12 @@ class CrmPipelineService
                     ? (float) $payload['won_amount']
                     : (float) ($lead->won_amount ?: $lead->estimated_value ?: 0);
                 $updateData['won_amount'] = $wonAmount;
-                $updateData['won_at'] = now();
+                $updateData['won_at'] = $lead->won_at ?: now();
+                // Kunci pemilik kredit closing: jika belum ada won_by_user_id, catat eksekutor closing saat ini
+                $updateData['won_by_user_id'] = $payload['won_by_user_id']
+                    ?? $lead->won_by_user_id
+                    ?? $actorUserId
+                    ?? $lead->assigned_to_user_id;
                 $updateData['lost_at'] = null;
                 $updateData['lost_reason'] = null;
                 $updateData['temperature'] = CrmLead::TEMP_HOT;
@@ -343,6 +532,7 @@ class CrmPipelineService
                 $updateData['lost_at'] = now();
                 $updateData['lost_reason'] = $payload['lost_reason'] ?? ($lead->lost_reason ?: 'Lainnya');
                 $updateData['won_at'] = null;
+                $updateData['won_by_user_id'] = null;
             } else {
                 // Kembali ke tahap aktif (open)
                 $updateData['won_at'] = null;
@@ -352,7 +542,7 @@ class CrmPipelineService
             $lead->update($updateData);
             $lead->refresh()->load(['stage', 'conversation']);
 
-            // Sinkronisasi 2 arah ke Conversation terkait agar analitik lama & sidebar chat tetap konsisten
+            // Sinkronisasi 2 arah ke Conversation terkait (hanya update status tampilan terbaru)
             if ($lead->conversation) {
                 $convUpdate = [];
                 if ($targetStage->isWon()) {
@@ -360,7 +550,7 @@ class CrmPipelineService
                         'closing_status' => 'deal',
                         'closing_amount' => $lead->won_amount ?? 0,
                         'closing_notes' => $lead->notes,
-                        'closed_by_user_id' => $actorUserId ?: $lead->assigned_to_user_id,
+                        'closed_by_user_id' => $lead->won_by_user_id ?: $actorUserId ?: $lead->assigned_to_user_id,
                         'closed_at' => $lead->won_at ?? now(),
                         'status' => 'closed',
                     ];
@@ -403,6 +593,7 @@ class CrmPipelineService
                 'description' => $desc,
                 'meta' => [
                     'won_amount' => $targetStage->isWon() ? (float) ($lead->won_amount ?? 0) : null,
+                    'won_by_user_id' => $targetStage->isWon() ? $lead->won_by_user_id : null,
                     'lost_reason' => $targetStage->isLost() ? $lead->lost_reason : null,
                     'order_id' => $lead->order_id,
                 ],

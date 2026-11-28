@@ -69,6 +69,9 @@ export default function EcommerceSettingsIndex({
         cs_phone: globalSettings?.cs_phone || '081298765432',
         dynamic_shipping: Boolean(globalSettings?.dynamic_shipping),
         instant_payment: Boolean(globalSettings?.instant_payment),
+        crm_auto_reopen_after_won: globalSettings?.crm_auto_reopen_after_won ?? true,
+        crm_repeat_lead_cooldown_minutes: Number(globalSettings?.crm_repeat_lead_cooldown_minutes ?? 120),
+        crm_auto_unassign_on_reopen: globalSettings?.crm_auto_unassign_on_reopen ?? true,
     });
     const [isSavingGlobal, setIsSavingGlobal] = useState(false);
 
@@ -978,6 +981,121 @@ export default function EcommerceSettingsIndex({
                                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
                                             Otomatisasi verifikasi pembayaran dengan Midtrans / Xendit tanpa verifikasi mutasi manual.
                                         </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pengaturan Smart Cooldown Multi-Closing CRM */}
+                            <div className="p-5 bg-indigo-50/60 rounded-2xl border border-indigo-200/80 space-y-4">
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                    <div>
+                                        <h3 className="text-sm font-black text-indigo-950 flex items-center gap-2">
+                                            <Repeat className="w-4 h-4 text-indigo-600" />
+                                            Smart Cooldown Multi-Closing CRM (Repeat Order)
+                                        </h3>
+                                        <p className="text-xs text-indigo-900/75 mt-0.5">
+                                            Atur jeda waktu otomatis pembuatan kartu peluang/transaksi baru ketika customer yang sudah <strong>WON / LOST</strong> mengirim chat lagi (mis. beli HP pagi oleh CS A, lalu malam beli lagi oleh CS B tanpa menimpa omset pagi).
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="p-3.5 bg-white rounded-xl border border-indigo-100 flex items-start gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            id="crm_auto_reopen_after_won"
+                                            checked={Boolean(globalForm.crm_auto_reopen_after_won)}
+                                            onChange={(e) =>
+                                                setGlobalForm({
+                                                    ...globalForm,
+                                                    crm_auto_reopen_after_won: e.target.checked,
+                                                })
+                                            }
+                                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 mt-0.5"
+                                        />
+                                        <div>
+                                            <label
+                                                htmlFor="crm_auto_reopen_after_won"
+                                                className="text-xs font-bold text-slate-900 cursor-pointer block"
+                                            >
+                                                Aktifkan Auto-Spawn Peluang Baru
+                                            </label>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                Otomatis buat kartu lead baru jika customer chat lagi melewati batas cooldown.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 bg-white rounded-xl border border-indigo-100 space-y-2">
+                                        <label className="block text-xs font-bold text-slate-900">
+                                            Durasi Smart Cooldown (Menit)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={10080}
+                                            value={globalForm.crm_repeat_lead_cooldown_minutes}
+                                            onChange={(e) =>
+                                                setGlobalForm({
+                                                    ...globalForm,
+                                                    crm_repeat_lead_cooldown_minutes: Number(e.target.value || 0),
+                                                })
+                                            }
+                                            className="w-full px-3 py-1.5 font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                                        />
+                                        <div className="flex flex-wrap gap-1">
+                                            {[
+                                                { label: '30m', val: 30 },
+                                                { label: '1 Jam', val: 60 },
+                                                { label: '2 Jam', val: 120 },
+                                                { label: '6 Jam', val: 360 },
+                                                { label: '24 Jam', val: 1440 },
+                                            ].map((preset) => (
+                                                <button
+                                                    key={preset.val}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setGlobalForm({
+                                                            ...globalForm,
+                                                            crm_repeat_lead_cooldown_minutes: preset.val,
+                                                        })
+                                                    }
+                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                                        Number(globalForm.crm_repeat_lead_cooldown_minutes) === preset.val
+                                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-indigo-50'
+                                                    }`}
+                                                >
+                                                    {preset.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 bg-white rounded-xl border border-indigo-100 flex items-start gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            id="crm_auto_unassign_on_reopen"
+                                            checked={Boolean(globalForm.crm_auto_unassign_on_reopen)}
+                                            onChange={(e) =>
+                                                setGlobalForm({
+                                                    ...globalForm,
+                                                    crm_auto_unassign_on_reopen: e.target.checked,
+                                                })
+                                            }
+                                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 mt-0.5"
+                                        />
+                                        <div>
+                                            <label
+                                                htmlFor="crm_auto_unassign_on_reopen"
+                                                className="text-xs font-bold text-slate-900 cursor-pointer block"
+                                            >
+                                                Lepas Handle Otomatis Saat Re-Open
+                                            </label>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                Masuk ke antrean bebas agar CS shift berikutnya bisa langsung mengambil chat baru (kredit closing CS lama tetap terkunci).
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

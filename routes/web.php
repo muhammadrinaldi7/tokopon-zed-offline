@@ -114,6 +114,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
         Route::post('/chat/{conversation}/notes', [\App\Http\Controllers\Crm\CsChatController::class, 'saveNotes'])->name('chat.notes');
         Route::post('/chat/{conversation}/stage', [\App\Http\Controllers\Crm\PipelineController::class, 'moveByConversation'])->name('chat.stage');
+        Route::post('/chat/{conversation}/new-lead', [\App\Http\Controllers\Crm\PipelineController::class, 'createNewDealForConversation'])->name('chat.new-lead');
         Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
 
         // ─── Sub-Modul: CRM Sales Pipeline (Kualifikasi Customer sampai WON) ───

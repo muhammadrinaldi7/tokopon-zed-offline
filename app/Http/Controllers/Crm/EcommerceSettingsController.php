@@ -49,6 +49,9 @@ class EcommerceSettingsController extends Controller
                     'dynamic_shipping' => filter_var($settingService->get('ecommerce_dynamic_shipping', false), FILTER_VALIDATE_BOOLEAN),
                     'instant_payment' => filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN),
                     'cs_phone' => (string) $settingService->get('ecommerce_cs_phone', '081298765432'),
+                    'crm_auto_reopen_after_won' => filter_var($settingService->get('crm_auto_reopen_after_won', true), FILTER_VALIDATE_BOOLEAN),
+                    'crm_repeat_lead_cooldown_minutes' => (int) $settingService->get('crm_repeat_lead_cooldown_minutes', 120),
+                    'crm_auto_unassign_on_reopen' => filter_var($settingService->get('crm_auto_unassign_on_reopen', true), FILTER_VALIDATE_BOOLEAN),
                 ];
 
                 $referralSettings = [
@@ -511,13 +514,25 @@ class EcommerceSettingsController extends Controller
             'cs_phone' => 'required|string|max:20',
             'dynamic_shipping' => 'boolean',
             'instant_payment' => 'boolean',
+            'crm_auto_reopen_after_won' => 'nullable|boolean',
+            'crm_repeat_lead_cooldown_minutes' => 'nullable|integer|min:0|max:10080',
+            'crm_auto_unassign_on_reopen' => 'nullable|boolean',
         ]);
 
         $settingService->set('ecommerce_cs_phone', $validated['cs_phone']);
-        $settingService->set('ecommerce_dynamic_shipping', $validated['dynamic_shipping'] ? '1' : '0');
-        $settingService->set('ecommerce_instant_payment', $validated['instant_payment'] ? '1' : '0');
+        $settingService->set('ecommerce_dynamic_shipping', !empty($validated['dynamic_shipping']) ? '1' : '0');
+        $settingService->set('ecommerce_instant_payment', !empty($validated['instant_payment']) ? '1' : '0');
+        if (array_key_exists('crm_auto_reopen_after_won', $validated)) {
+            $settingService->set('crm_auto_reopen_after_won', $validated['crm_auto_reopen_after_won'] ? '1' : '0', 'boolean', 'crm');
+        }
+        if (array_key_exists('crm_repeat_lead_cooldown_minutes', $validated) && $validated['crm_repeat_lead_cooldown_minutes'] !== null) {
+            $settingService->set('crm_repeat_lead_cooldown_minutes', (int) $validated['crm_repeat_lead_cooldown_minutes'], 'integer', 'crm');
+        }
+        if (array_key_exists('crm_auto_unassign_on_reopen', $validated)) {
+            $settingService->set('crm_auto_unassign_on_reopen', $validated['crm_auto_unassign_on_reopen'] ? '1' : '0', 'boolean', 'crm');
+        }
 
-        return redirect()->back()->with('success', 'Pengaturan global E-Commerce berhasil disimpan.');
+        return redirect()->back()->with('success', 'Pengaturan global E-Commerce & Smart Cooldown CRM berhasil disimpan.');
     }
 
     /**

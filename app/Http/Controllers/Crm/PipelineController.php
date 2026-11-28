@@ -62,6 +62,7 @@ class PipelineController extends Controller
             ->with([
                 'stage',
                 'assignedTo:id,name,avatar',
+                'wonBy:id,name,avatar',
                 'businessUnit:id,name',
                 'productAccurate:id,name,base_price',
                 'order:id,order_number,total_amount,order_status',
@@ -161,6 +162,7 @@ class PipelineController extends Controller
             'stage_id' => $stage->id,
             'business_unit_id' => $validated['business_unit_id'] ?? $user->business_unit_id,
             'assigned_to_user_id' => $assigneeId,
+            'won_by_user_id' => $stage->isWon() ? $user->id : null,
             'product_accurate_id' => $validated['product_accurate_id'] ?? null,
             'customer_name' => trim($validated['customer_name']),
             'customer_phone' => $validated['customer_phone'] ? trim($validated['customer_phone']) : null,
@@ -292,18 +294,48 @@ class PipelineController extends Controller
     }
 
     /**
-     * Ubah tahap kualifikasi langsung dari Live Chat CS berdasarkan conversation_id
+     * Ubah tahap kualifikasi langsung dari Live Chat CS berdasarkan conversation_id.
+     * Jika transaksi sebelumnya sudah WON/LOST, otomatis membentuk kartu peluang baru agar WON lama tidak tertimpa.
      */
     public function moveByConversation(Request $request, Conversation $conversation): JsonResponse
     {
         $user = Auth::user();
-        $lead = $this->pipelineService->syncLeadFromConversation($conversation, $user->id);
+        $lead = $this->pipelineService->syncLeadFromConversation($conversation, $user->id, false, true);
 
         if (!$lead) {
             return response()->json(['success' => false, 'message' => 'Gagal menginisialisasi data pipeline.'], 500);
         }
 
         return $this->moveStage($request, $lead);
+    }
+
+    /**
+     * Mulai kartu peluang / transaksi baru secara eksplisit di dalam room chat yang sama (Multi-Closing)
+     */
+    public function createNewDealForConversation(Request $request, Conversation $conversation): JsonResponse
+    {
+        $user = Auth::user();
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:1000',
+            'estimated_value' => 'nullable|numeric|min:0',
+            'interest_type' => 'nullable|in:new,second,trade_in,other',
+        ]);
+
+        $lead = $this->pipelineService->createNewLeadForConversation($conversation, $user->id, [
+            'assigned_to_user_id' => $user->id,
+            'notes' => $validated['notes'] ?? null,
+            'estimated_value' => isset($validated['estimated_value']) ? (float) $validated['estimated_value'] : 0,
+            'interest_type' => $validated['interest_type'] ?? null,
+            'activity_description' => "Peluang transaksi baru dibuka manual oleh {$user->name} di Live Chat #{$conversation->id}.",
+        ]);
+
+        $lead->load(['stage', 'assignedTo:id,name,avatar', 'wonBy:id,name,avatar', 'businessUnit:id,name', 'productAccurate:id,name,base_price', 'order:id,order_number,total_amount,order_status', 'activities.actor:id,name']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Peluang transaksi baru berhasil dibuka! Transaksi closing sebelumnya tetap terkunci aman.',
+            'lead' => $this->formatLead($lead),
+        ], 201);
     }
 
     /**
@@ -702,6 +734,8 @@ class PipelineController extends Controller
             'assignedToId' => $lead->assigned_to_user_id,
             'assignedToName' => $lead->assignedTo?->name,
             'assignedToAvatar' => $lead->assignedTo?->avatar,
+            'wonById' => $lead->won_by_user_id,
+            'wonByName' => $lead->wonBy?->name,
             'isAssignedToMe' => $lead->assigned_to_user_id === Auth::id(),
             'productId' => $lead->product_accurate_id,
             'productName' => $lead->productAccurate?->name,

@@ -40,7 +40,7 @@ export default function ClosingModal({
             });
 
             if (res.data?.success) {
-                onClosingSuccess(status, amount);
+                onClosingSuccess(status, amount, res.data);
                 onClose();
             }
         } catch (err) {
@@ -79,6 +79,14 @@ export default function ClosingModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {activeConv.wonCount > 0 && (
+                        <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 leading-relaxed">
+                            <strong>Multi-Closing Aktif:</strong> Customer ini sudah memiliki{' '}
+                            <strong>{activeConv.wonCount} transaksi WON</strong> ({activeConv.formattedTotalWonAmount || ''}).
+                            Menyimpan Deal baru akan tercatat sebagai <strong>transaksi terpisah</strong> atas nama Anda tanpa menimpa closing sebelumnya.
+                        </div>
+                    )}
+
                     {/* Status Radio Chips */}
                     <div className="grid grid-cols-3 gap-2">
                         <button

@@ -305,6 +305,56 @@ export default function Customer360Drawer({
                         )}
                     </div>
 
+                    {/* 3.5 Riwayat Multi-Closing & Kualifikasi CRM */}
+                    {Array.isArray(activeConv?.dealHistory) && activeConv.dealHistory.length > 0 && (
+                        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                                    Riwayat Closing CRM
+                                </span>
+                                {activeConv.wonCount > 0 && (
+                                    <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        {activeConv.wonCount}x WON • {activeConv.formattedTotalWonAmount}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                {activeConv.dealHistory.map((d) => (
+                                    <div
+                                        key={d.id}
+                                        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs flex items-start justify-between gap-2"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span
+                                                    className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                                        d.stageType === 'won'
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : d.stageType === 'lost'
+                                                            ? 'bg-rose-100 text-rose-700'
+                                                            : 'bg-indigo-100 text-indigo-700'
+                                                    }`}
+                                                >
+                                                    {d.stageName}
+                                                </span>
+                                                <span className="text-[10px] text-slate-500 font-semibold">
+                                                    oleh {d.wonByName}
+                                                </span>
+                                            </div>
+                                            {d.notes && (
+                                                <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{d.notes}</p>
+                                            )}
+                                            <div className="text-[10px] text-slate-400 mt-0.5">{d.closedAt}</div>
+                                        </div>
+                                        <span className="font-mono font-black text-slate-900 shrink-0">
+                                            {d.formattedAmount}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* 4. Catatan Khusus CRM Internal */}
                     <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
                         <div className="flex items-center gap-1.5">

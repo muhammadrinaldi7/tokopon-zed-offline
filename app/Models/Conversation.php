@@ -70,6 +70,11 @@ class Conversation extends Model
         return $this->hasOne(CrmLead::class, 'conversation_id')->latestOfMany();
     }
 
+    public function leads()
+    {
+        return $this->hasMany(CrmLead::class, 'conversation_id')->latest('id');
+    }
+
     public function unreadCountForCs()
     {
         return $this->messages()

@@ -60,6 +60,9 @@ class CsChatController extends Controller
                 'assignedTo',
                 'businessUnit',
                 'lead.stage',
+                'leads.stage',
+                'leads.wonBy:id,name',
+                'leads.assignedTo:id,name',
             ])->find($activeId);
 
             if ($activeConvModel) {
@@ -315,6 +318,31 @@ class CsChatController extends Controller
             $waUrl = 'https://wa.me/' . $cleanPhone . '?text=' . urlencode($text);
         }
 
+        // Riwayat seluruh transaksi / kartu peluang pada percakapan ini (Multi-Closing)
+        $allConvLeads = $conv->relationLoaded('leads')
+            ? $conv->leads
+            : (Schema::hasTable('crm_leads')
+                ? $conv->leads()->with(['stage', 'wonBy:id,name', 'assignedTo:id,name'])->get()
+                : collect());
+
+        $wonLeads = $allConvLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_WON);
+        $totalWonAmount = (float) $wonLeads->sum(fn ($l) => (float) ($l->won_amount ?? $l->estimated_value ?? 0));
+        $dealHistory = $allConvLeads->map(fn ($l) => [
+            'id' => $l->id,
+            'stageName' => $l->stage?->name ?? 'New Lead',
+            'stageColor' => $l->stage?->color ?? 'slate',
+            'stageType' => $l->stage?->stage_type ?? 'open',
+            'amount' => (float) ($l->stage?->stage_type === 'won' ? ($l->won_amount ?? $l->estimated_value ?? 0) : ($l->estimated_value ?? 0)),
+            'formattedAmount' => 'Rp ' . number_format((float) ($l->stage?->stage_type === 'won' ? ($l->won_amount ?? $l->estimated_value ?? 0) : ($l->estimated_value ?? 0)), 0, ',', '.'),
+            'wonByName' => $l->wonBy?->name ?? $l->assignedTo?->name ?? '-',
+            'closedAt' => ($l->won_at ?? $l->lost_at ?? $l->created_at)?->format('d M Y, H:i'),
+            'notes' => $l->notes,
+            'lostReason' => $l->lost_reason,
+        ])->values()->all();
+
+        $activeLead = $allConvLeads->first(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_OPEN)
+            ?: $conv->lead;
+
         return [
             'id' => $conv->id,
             'userId' => $conv->user_id,
@@ -334,13 +362,17 @@ class CsChatController extends Controller
             'isAssignedToMe' => $conv->assigned_to_user_id === Auth::id(),
             'businessUnitId' => $conv->business_unit_id,
             'businessUnitName' => $conv->businessUnit?->name ?? 'Toko Retail',
-            'leadId' => $conv->lead?->id,
-            'stageId' => $conv->lead?->stage_id,
-            'stageName' => $conv->lead?->stage?->name,
-            'stageColor' => $conv->lead?->stage?->color,
-            'stageType' => $conv->lead?->stage?->stage_type,
-            'leadTemperature' => $conv->lead?->temperature,
-            'nextFollowUpLabel' => $conv->lead?->next_follow_up_at?->format('d M Y, H:i'),
+            'leadId' => $activeLead?->id,
+            'stageId' => $activeLead?->stage_id,
+            'stageName' => $activeLead?->stage?->name,
+            'stageColor' => $activeLead?->stage?->color,
+            'stageType' => $activeLead?->stage?->stage_type,
+            'leadTemperature' => $activeLead?->temperature,
+            'nextFollowUpLabel' => $activeLead?->next_follow_up_at?->format('d M Y, H:i'),
+            'wonCount' => $wonLeads->count(),
+            'totalWonAmount' => $totalWonAmount,
+            'formattedTotalWonAmount' => 'Rp ' . number_format($totalWonAmount, 0, ',', '.'),
+            'dealHistory' => $dealHistory,
             'product' => $conv->productAccurate ? [
                 'id' => $conv->productAccurate->id,
                 'name' => $conv->productAccurate->name,
@@ -639,18 +671,20 @@ class CsChatController extends Controller
             'status' => $status === 'deal' ? 'closed' : $conv->status,
         ]);
 
-        // Sinkronkan juga ke tahap CRM Pipeline (deal -> WON, follow_up -> Negosiasi/Follow-Up, lost -> LOST)
+        // Sinkronkan ke CRM Pipeline (Multi-Closing: jika lead lama sudah WON/LOST, otomatis buat kartu baru agar transaksi lama tidak tertimpa!)
+        $createdOrUpdatedLead = null;
         try {
             $pipelineService = app(CrmPipelineService::class);
-            $lead = $pipelineService->syncLeadFromConversation($conv, Auth::id());
+            $lead = $pipelineService->syncLeadFromConversation($conv, Auth::id(), false, true);
             if ($lead) {
                 $targetStage = match ($status) {
                     'deal' => $pipelineService->getWonStage(),
                     'lost' => $pipelineService->getLostStage(),
                     default => $pipelineService->getFollowUpStage(),
                 };
-                $pipelineService->moveLeadToStage($lead, $targetStage, Auth::id(), [
+                $createdOrUpdatedLead = $pipelineService->moveLeadToStage($lead, $targetStage, Auth::id(), [
                     'won_amount' => $status === 'deal' ? (float) ($request->input('amount') ?? 0) : null,
+                    'won_by_user_id' => $status === 'deal' ? Auth::id() : null,
                     'lost_reason' => $status === 'lost' ? ($request->input('notes') ?: 'Lainnya') : null,
                     'notes' => $request->input('notes'),
                 ]);
@@ -659,7 +693,32 @@ class CsChatController extends Controller
             Log::warning('Sync closing to CRM Pipeline skipped: ' . $e->getMessage());
         }
 
-        return response()->json(['success' => true]);
+        // Hitung total multi-closing terbaru untuk dikirim balik ke UI Live Chat
+        $allConvLeads = Schema::hasTable('crm_leads')
+            ? $conv->leads()->with(['stage', 'wonBy:id,name', 'assignedTo:id,name'])->get()
+            : collect();
+        $wonLeads = $allConvLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_WON);
+        $totalWonAmount = (float) $wonLeads->sum(fn ($l) => (float) ($l->won_amount ?? $l->estimated_value ?? 0));
+
+        return response()->json([
+            'success' => true,
+            'leadId' => $createdOrUpdatedLead?->id,
+            'wonCount' => $wonLeads->count(),
+            'totalWonAmount' => $totalWonAmount,
+            'formattedTotalWonAmount' => 'Rp ' . number_format($totalWonAmount, 0, ',', '.'),
+            'dealHistory' => $allConvLeads->map(fn ($l) => [
+                'id' => $l->id,
+                'stageName' => $l->stage?->name ?? 'New Lead',
+                'stageColor' => $l->stage?->color ?? 'slate',
+                'stageType' => $l->stage?->stage_type ?? 'open',
+                'amount' => (float) ($l->stage?->stage_type === 'won' ? ($l->won_amount ?? $l->estimated_value ?? 0) : ($l->estimated_value ?? 0)),
+                'formattedAmount' => 'Rp ' . number_format((float) ($l->stage?->stage_type === 'won' ? ($l->won_amount ?? $l->estimated_value ?? 0) : ($l->estimated_value ?? 0)), 0, ',', '.'),
+                'wonByName' => $l->wonBy?->name ?? $l->assignedTo?->name ?? '-',
+                'closedAt' => ($l->won_at ?? $l->lost_at ?? $l->created_at)?->format('d M Y, H:i'),
+                'notes' => $l->notes,
+                'lostReason' => $l->lost_reason,
+            ])->values()->all(),
+        ]);
     }
 
     /**

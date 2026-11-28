@@ -36,6 +36,7 @@ export default function ChatStream({
     onClaimToggle,
     pipelineStages = [],
     onQuickStageChange,
+    onCreateNewDeal,
     isUpdatingStage = false,
     selectedProduct,
     onRemoveProduct,
@@ -174,12 +175,16 @@ export default function ChatStream({
                                 </div>
                             )}
 
-                            {/* Closing Status */}
-                            {activeConv.closingStatus === 'deal' && (
+                            {/* Closing Status / Multi-Closing Badge */}
+                            {activeConv.wonCount > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    🎉 {activeConv.wonCount}x WON ({activeConv.formattedTotalWonAmount || ''})
+                                </span>
+                            ) : activeConv.closingStatus === 'deal' ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     DEAL 🎉
                                 </span>
-                            )}
+                            ) : null}
                         </div>
 
                         {/* Sub-header info */}
@@ -203,6 +208,19 @@ export default function ChatStream({
 
                 {/* Header Action Buttons */}
                 <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {/* Tombol Mulai Peluang/Transaksi Baru jika lead saat ini sudah WON/LOST */}
+                    {(activeConv.stageType === 'won' || activeConv.stageType === 'lost') && onCreateNewDeal && (
+                        <button
+                            type="button"
+                            disabled={isUpdatingStage}
+                            onClick={onCreateNewDeal}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all shadow-2xs"
+                            title="Buka kartu peluang baru untuk repeat order tanpa menimpa closing sebelumnya"
+                        >
+                            + Transaksi Baru
+                        </button>
+                    )}
+
                     {/* Quick CRM Pipeline Stage Selector */}
                     {pipelineStages.length > 0 && onQuickStageChange && (
                         <select

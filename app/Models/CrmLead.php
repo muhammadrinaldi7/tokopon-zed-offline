@@ -29,6 +29,7 @@ class CrmLead extends Model
         'user_id',
         'business_unit_id',
         'assigned_to_user_id',
+        'won_by_user_id',
         'product_accurate_id',
         'order_id',
         'customer_name',
@@ -76,6 +77,11 @@ class CrmLead extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function wonBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'won_by_user_id');
     }
 
     public function productAccurate(): BelongsTo

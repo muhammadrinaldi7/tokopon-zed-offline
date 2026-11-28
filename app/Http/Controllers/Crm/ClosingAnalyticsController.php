@@ -227,6 +227,99 @@ class ClosingAnalyticsController extends Controller
                 ->values()
                 ->take(6)
                 ->all();
+
+            // Multi-Closing Single Source of Truth:
+            // Jika crm_leads memiliki data, hitung Total Deals, Omset, Leaderboard (by won_by_user_id), & Recent Deals dari crm_leads
+            // agar 1 customer yg beli 2x di hari yg sama (CS A pagi + CS B malam) tercatat terpisah & akurat!
+            if ($totalLeadsCount > 0) {
+                $totalDeals = $wonLeads->count();
+                $totalFollowUps = $openLeads->count();
+                $totalLost = $lostLeads->count();
+                $totalRevenue = $wonPipeRev;
+                $conversionRate = $totalLeadsCount > 0 ? round(($totalDeals / $totalLeadsCount) * 100, 1) : 0;
+                $avgDealSize = $totalDeals > 0 ? round($totalRevenue / $totalDeals) : 0;
+
+                // Leaderboard Multi-Closing per CS berdasarkan won_by_user_id / assigned_to_user_id
+                $agentStats = [];
+                foreach ($allLeads as $leadRow) {
+                    $isWonRow = $leadRow->stage?->stage_type === CrmPipelineStage::TYPE_WON;
+                    $isLostRow = $leadRow->stage?->stage_type === CrmPipelineStage::TYPE_LOST;
+                    $agentId = $isWonRow
+                        ? ($leadRow->won_by_user_id ?: $leadRow->assigned_to_user_id)
+                        : $leadRow->assigned_to_user_id;
+
+                    if (!$agentId) {
+                        continue;
+                    }
+                    if (!isset($agentStats[$agentId])) {
+                        $agentStats[$agentId] = [
+                            'total_handled' => 0,
+                            'deal_count' => 0,
+                            'follow_up_count' => 0,
+                            'lost_count' => 0,
+                            'total_omset' => 0.0,
+                        ];
+                    }
+                    $agentStats[$agentId]['total_handled']++;
+                    if ($isWonRow) {
+                        $agentStats[$agentId]['deal_count']++;
+                        $agentStats[$agentId]['total_omset'] += (float) ($leadRow->won_amount ?? $leadRow->estimated_value ?? 0);
+                    } elseif ($isLostRow) {
+                        $agentStats[$agentId]['lost_count']++;
+                    } else {
+                        $agentStats[$agentId]['follow_up_count']++;
+                    }
+                }
+
+                uasort($agentStats, fn ($a, $b) => $b['total_omset'] <=> $a['total_omset'] ?: $b['deal_count'] <=> $a['deal_count']);
+                $agentUsers = User::whereIn('id', array_keys($agentStats))->get()->keyBy('id');
+
+                $rankIdx = 1;
+                $csLeaderboard = collect($agentStats)->map(function ($st, $uid) use ($agentUsers, &$rankIdx) {
+                    $u = $agentUsers->get($uid);
+                    $cRate = $st['total_handled'] > 0 ? round(($st['deal_count'] / $st['total_handled']) * 100, 1) : 0;
+                    return [
+                        'rank' => $rankIdx++,
+                        'user_id' => $uid,
+                        'agent_name' => $u?->name ?? 'Staf CS #' . $uid,
+                        'agent_email' => $u?->email,
+                        'agent_avatar' => $u?->avatar,
+                        'total_handled' => (int) $st['total_handled'],
+                        'deal_count' => (int) $st['deal_count'],
+                        'follow_up_count' => (int) $st['follow_up_count'],
+                        'lost_count' => (int) $st['lost_count'],
+                        'total_omset' => (float) $st['total_omset'],
+                        'formatted_omset' => 'Rp ' . number_format($st['total_omset'], 0, ',', '.'),
+                        'rate' => $cRate,
+                    ];
+                })->values();
+
+                // 15 Transaksi Closing (WON) Terbaru dari crm_leads
+                $wonLeadIds = $wonLeads->sortByDesc(fn ($l) => $l->won_at ?? $l->updated_at)->take(15)->pluck('id');
+                $recentWonModels = CrmLead::with(['wonBy:id,name,avatar', 'assignedTo:id,name,avatar', 'productAccurate:id,name', 'businessUnit:id,name'])
+                    ->whereIn('id', $wonLeadIds)
+                    ->orderByDesc('won_at')
+                    ->orderByDesc('id')
+                    ->get();
+
+                $recentDeals = $recentWonModels->map(function ($deal) {
+                    $amt = (float) ($deal->won_amount ?? $deal->estimated_value ?? 0);
+                    $closer = $deal->wonBy ?: $deal->assignedTo;
+                    return [
+                        'id' => $deal->id,
+                        'customer_name' => $deal->customer_name ?: 'Pelanggan',
+                        'customer_phone' => $deal->customer_phone ?: '-',
+                        'closed_by_name' => $closer?->name ?? 'Admin',
+                        'closed_by_avatar' => $closer?->avatar,
+                        'amount' => $amt,
+                        'formatted_amount' => 'Rp ' . number_format($amt, 0, ',', '.'),
+                        'notes' => $deal->notes,
+                        'product_name' => $deal->productAccurate?->name,
+                        'business_unit' => $deal->businessUnit?->name,
+                        'closed_at' => $deal->won_at ? $deal->won_at->format('d M Y, H:i') : ($deal->updated_at?->format('d M Y, H:i') ?? '-'),
+                    ];
+                });
+            }
         }
 
         return Inertia::render('Analytics/Index', [

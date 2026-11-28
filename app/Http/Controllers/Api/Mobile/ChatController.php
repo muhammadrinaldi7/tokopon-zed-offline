@@ -335,6 +335,15 @@ class ChatController extends Controller
             'message' => $cleanMessage,
         ]);
 
+        // Auto-Spawn Peluang Baru (Multi-Closing) jika customer/guest chat lagi melewati Smart Cooldown dinamis
+        if (in_array($senderType, ['customer', 'guest'], true)) {
+            try {
+                app(\App\Services\CrmPipelineService::class)->handleCustomerMessageForRepeatLead($conversation);
+            } catch (\Throwable $e) {
+                // Jangan ganggu pengiriman pesan chat
+            }
+        }
+
         // Simpan lampiran file jika diunggah
         if ($request->hasFile('attachment')) {
             $message->addMedia($request->file('attachment'))->toMediaCollection('attachments');
