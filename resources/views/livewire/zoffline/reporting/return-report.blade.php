@@ -118,30 +118,31 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse ($claims as $claim)
+                        @php
+                            $returnedItem = $claim->returned_order_item;
+                            $returnedOrder = $returnedItem?->order ?? $claim->warranty?->orderItem?->order;
+                            $proyek = $claim->returned_sub_category;
+                        @endphp
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">{{ $claim->claim_number }}</div>
                                 <div class="text-sm text-gray-500">{{ $claim->claimed_at ? $claim->claimed_at->format('d/m/Y H:i') : '-' }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-900">{{ $claim->warranty->orderItem->order->branch->name ?? '-' }}</div>
+                                <div class="text-sm font-bold text-gray-900">{{ $returnedOrder->branch->name ?? '-' }}</div>
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 mt-1">
-                                    {{ $claim->warranty->orderItem->order->businessUnit->name ?? '-' }}
+                                    {{ $returnedOrder->businessUnit->name ?? '-' }}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">{{ $claim->customer->name ?? '-' }}</div>
                                 <div class="text-xs text-gray-500">{{ $claim->customer->profile->phone_number ?? '-' }}</div>
-                                <div class="text-xs text-indigo-600 font-medium mt-1">Sales: {{ $claim->warranty->orderItem->order->salesBy->name ?? '-' }}</div>
+                                <div class="text-xs text-indigo-600 font-medium mt-1">Sales: {{ $returnedOrder->salesBy->name ?? '-' }}</div>
                             </td>
                             <td class="px-6 py-4">
-                                @php
-                                    $variant = $claim->warranty->orderItem->variant;
-                                    $proyek = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
-                                @endphp
                                 <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="text-sm font-medium text-gray-900 line-clamp-2">
-                                        {{ $claim->warranty->orderItem->product_name ?? ($variant->name ?? 'Produk Tidak Diketahui') }}
+                                        {{ $claim->returned_product_name }}
                                     </span>
                                     @if(!empty($proyek))
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
@@ -152,9 +153,9 @@
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-xs font-mono font-bold text-gray-500">SN: {{ $claim->serial_number }}</span>
                                     <span class="text-xs text-gray-400">&bull;</span>
-                                    <span class="text-xs font-medium text-gray-600">Qty: {{ $claim->warranty->orderItem->qty ?? 1 }}</span>
+                                    <span class="text-xs font-medium text-gray-600">Qty: {{ $returnedItem->qty ?? 1 }}</span>
                                 </div>
-                                <div class="text-xs font-bold text-emerald-600 mt-1">Rp {{ number_format($claim->warranty->orderItem->price_at_checkout ?? 0, 0, ',', '.') }}</div>
+                                <div class="text-xs font-bold text-emerald-600 mt-1">Rp {{ number_format($returnedItem->price_at_checkout ?? 0, 0, ',', '.') }}</div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm text-gray-900 line-clamp-2" title="{{ $claim->issue_description }}">{{ $claim->issue_description }}</div>
@@ -275,28 +276,33 @@
                                     </div>
 
                                     <!-- Informasi Transaksi -->
+                                    @php
+                                        $selReturnedItem = $this->selectedClaim->returned_order_item;
+                                        $selReturnedOrder = $selReturnedItem?->order ?? $this->selectedClaim->warranty?->orderItem?->order;
+                                        $selProyek = $this->selectedClaim->returned_sub_category;
+                                    @endphp
                                     <div>
                                         <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI TRANSAKSI</h3>
                                         <dl class="space-y-2 text-sm">
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Unit Bisnis</dt>
-                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->businessUnit->name ?? '-' }}</dd>
+                                                <dd class="font-medium text-gray-900">{{ $selReturnedOrder->businessUnit->name ?? '-' }}</dd>
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Cabang</dt>
-                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->branch->name ?? '-' }}</dd>
+                                                <dd class="font-medium text-gray-900">{{ $selReturnedOrder->branch->name ?? '-' }}</dd>
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">No. Pesanan</dt>
-                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->order_number ?? '-' }}</dd>
+                                                <dd class="font-medium text-gray-900">{{ $selReturnedOrder->order_number ?? '-' }}</dd>
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">No. Invoice Accurate</dt>
-                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->accurate_invoice_no ?? '-' }}</dd>
+                                                <dd class="font-medium text-gray-900">{{ $selReturnedOrder->accurate_invoice_no ?? '-' }}</dd>
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Nama Sales</dt>
-                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->salesBy->name ?? '-' }}</dd>
+                                                <dd class="font-medium text-gray-900">{{ $selReturnedOrder->salesBy->name ?? '-' }}</dd>
                                             </div>
                                         </dl>
                                     </div>
@@ -318,18 +324,14 @@
 
                                     <!-- Informasi Produk -->
                                     <div>
-                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI PRODUK</h3>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI PRODUK DIRETUR</h3>
                                         <dl class="space-y-2 text-sm">
                                             <div>
                                                 <dt class="text-gray-500">Produk</dt>
                                                 <dd class="font-medium text-gray-900 mt-1">
-                                                    {{ $this->selectedClaim->warranty->orderItem->product_name ?? ($this->selectedClaim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui') }}
+                                                    {{ $this->selectedClaim->returned_product_name }}
                                                 </dd>
                                             </div>
-                                            @php
-                                                $selVariant = $this->selectedClaim->warranty->orderItem->variant;
-                                                $selProyek = $selVariant?->proyek ?? ($selVariant?->accurateData?->proyek ?? null);
-                                            @endphp
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Subkategori</dt>
                                                 <dd class="font-semibold text-purple-700">{{ $selProyek ?: '-' }}</dd>
@@ -340,7 +342,7 @@
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Harga Satuan & Qty</dt>
-                                                <dd class="font-medium text-gray-900">Rp {{ number_format($this->selectedClaim->warranty->orderItem->price_at_checkout ?? 0, 0, ',', '.') }} ({{ $this->selectedClaim->warranty->orderItem->qty ?? 1 }}x)</dd>
+                                                <dd class="font-medium text-gray-900">Rp {{ number_format($selReturnedItem->price_at_checkout ?? 0, 0, ',', '.') }} ({{ $selReturnedItem->qty ?? 1 }}x)</dd>
                                             </div>
                                         </dl>
                                     </div>

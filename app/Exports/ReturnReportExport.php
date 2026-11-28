@@ -62,19 +62,13 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
     {
         $this->rowNumber++;
 
-        $productName = $claim->warranty->orderItem->product_name 
-            ?? ($claim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui');
-
-        $item = $claim->warranty->orderItem;
-        $order = $item?->order;
+        $item = $claim->returned_order_item;
+        $productName = $claim->returned_product_name;
+        $order = $item?->order ?? $claim->warranty?->orderItem?->order;
         $unitBisnis = $order?->businessUnit?->name ?? '-';
         $cabang = $order?->branch?->name ?? '-';
 
-        $variant = $item?->variant;
-        $subKategori = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? '-');
-        if (empty($subKategori)) {
-            $subKategori = '-';
-        }
+        $subKategori = $claim->returned_sub_category ?: '-';
 
         $qty = $item->qty ?? 1;
         $hargaSatuan = $item->price_at_checkout ?? 0;
