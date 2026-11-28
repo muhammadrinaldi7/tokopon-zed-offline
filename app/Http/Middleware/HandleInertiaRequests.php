@@ -48,6 +48,7 @@ class HandleInertiaRequests extends Middleware
                     'business_unit_id' => $user->business_unit_id,
                     'active_business_unit_id' => method_exists($user, 'getActiveBusinessUnitId') ? $user->getActiveBusinessUnitId() : $user->business_unit_id,
                     'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
+                    'permissions' => method_exists($user, 'getAllPermissions') ? $user->getAllPermissions()->pluck('name')->values()->all() : [],
                 ] : null,
             ],
             'businessUnits' => fn () => \Illuminate\Support\Facades\Schema::hasTable('business_units')

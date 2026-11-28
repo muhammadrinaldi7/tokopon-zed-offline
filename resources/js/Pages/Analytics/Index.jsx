@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import EcommerceLayout from '@/Layouts/EcommerceLayout';
 import {
     TrendingUp,
@@ -25,6 +25,9 @@ export default function ClosingAnalyticsIndex({
     metrics = {},
     csLeaderboard = [],
     recentDeals = [],
+    funnelStages = [],
+    pipelineMetrics = {},
+    topLostReasons = [],
     filters = {}
 }) {
     const { businessUnits } = usePage().props;
@@ -409,6 +412,109 @@ export default function ClosingAnalyticsIndex({
                         </div>
                     </div>
                 </div>
+
+                {/* 4. Fase 3: Funnel Kualifikasi CRM & Analisis Alasan Batal */}
+                {funnelStages.length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        {/* Funnel Conversion Card (2 Kolom) */}
+                        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                <div>
+                                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                                        <Target className="w-4 h-4 text-indigo-600" />
+                                        <span>Funnel Kualifikasi Customer (Lead → WON)</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Potensi Pipeline Aktif: <strong className="text-indigo-700">{pipelineMetrics?.formatted_pipeline_value || 'Rp 0'}</strong>
+                                        {' '}• Rata-rata Waktu Closing: <strong className="text-slate-800">{pipelineMetrics?.avg_hours_to_win || 0} jam</strong>
+                                        {' '}• Overdue Follow-Up: <strong className="text-rose-600">{pipelineMetrics?.overdue_follow_ups || 0}</strong>
+                                    </p>
+                                </div>
+                                <Link
+                                    href="/crm/pipeline"
+                                    className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold inline-flex items-center gap-1 shrink-0"
+                                >
+                                    <span>Buka Papan Pipeline</span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+
+                            <div className="space-y-3">
+                                {funnelStages.map((stage) => {
+                                    const barColor =
+                                        stage.stageType === 'won'
+                                            ? 'bg-emerald-500'
+                                            : stage.stageType === 'lost'
+                                            ? 'bg-rose-400'
+                                            : 'bg-indigo-500';
+                                    const widthPct = Math.max(stage.count > 0 ? 6 : 0, Math.min(100, stage.share_percent || 0));
+
+                                    return (
+                                        <div key={stage.id} className="space-y-1">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <div className="font-bold text-slate-800 flex items-center gap-2">
+                                                    <span>{stage.name}</span>
+                                                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                        {stage.count} customer ({stage.share_percent}%)
+                                                    </span>
+                                                </div>
+                                                <span className="font-mono font-bold text-slate-700">
+                                                    {stage.formatted_value}
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                                    style={{ width: `${widthPct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Top Alasan Batal (Lost Reasons) */}
+                        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 space-y-4">
+                            <div className="border-b border-slate-100 pb-3">
+                                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                                    <XCircle className="w-4 h-4 text-rose-600" />
+                                    <span>Top Alasan Batal (LOST)</span>
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Total {pipelineMetrics?.lost_leads_count || 0} prospek gagal closing
+                                </p>
+                            </div>
+
+                            {topLostReasons.length === 0 ? (
+                                <div className="py-10 text-center text-xs text-slate-400">
+                                    Belum ada data alasan batal pada periode ini.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {topLostReasons.map((item, idx) => (
+                                        <div key={idx} className="space-y-1">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="font-bold text-slate-700 truncate pr-2">
+                                                    {item.reason}
+                                                </span>
+                                                <span className="font-extrabold text-rose-600 shrink-0">
+                                                    {item.count} ({item.percent}%)
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 bg-rose-50 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-rose-500 rounded-full"
+                                                    style={{ width: `${Math.max(8, item.percent)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </EcommerceLayout>
     );

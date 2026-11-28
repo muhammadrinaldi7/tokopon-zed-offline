@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Crm;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessUnit;
 use App\Models\Conversation;
+use App\Models\CrmLead;
+use App\Models\CrmPipelineStage;
 use App\Models\User;
+use App\Services\CrmPipelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -122,6 +127,108 @@ class ClosingAnalyticsController extends Controller
                 ];
             });
 
+        // ─── Fase 3: Analitik Funnel & Pipeline CRM ───
+        $funnelStages = [];
+        $topLostReasons = [];
+        $pipelineMetrics = [
+            'total_leads' => 0,
+            'active_leads_count' => 0,
+            'won_leads_count' => 0,
+            'lost_leads_count' => 0,
+            'pipeline_value' => 0,
+            'formatted_pipeline_value' => 'Rp 0',
+            'won_pipeline_revenue' => 0,
+            'formatted_won_pipeline_revenue' => 'Rp 0',
+            'pipeline_conversion_rate' => 0,
+            'avg_hours_to_win' => 0,
+            'overdue_follow_ups' => 0,
+        ];
+
+        if (Schema::hasTable('crm_leads') && Schema::hasTable('crm_pipeline_stages')) {
+            app(CrmPipelineService::class)->ensureDefaultStagesExist();
+
+            $leadQuery = CrmLead::visibleTo(Auth::user());
+            if (!empty($filterBu)) {
+                $leadQuery->where('business_unit_id', $filterBu);
+            }
+            if ($period === 'today') {
+                $leadQuery->whereDate('created_at', Carbon::today());
+            } elseif ($period === 'this_week') {
+                $leadQuery->whereBetween('created_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()]);
+            } elseif ($period === 'this_month') {
+                $leadQuery->whereMonth('created_at', $now->month)->whereYear('created_at', $now->year);
+            } elseif ($period === 'custom' && !empty($startDate) && !empty($endDate)) {
+                $leadQuery->whereBetween('created_at', [
+                    Carbon::parse($startDate)->startOfDay(),
+                    Carbon::parse($endDate)->endOfDay(),
+                ]);
+            }
+
+            $allLeads = (clone $leadQuery)->with('stage')->get();
+            $totalLeadsCount = $allLeads->count();
+            $stages = CrmPipelineStage::where('is_active', true)->orderBy('sort_order')->orderBy('id')->get();
+
+            foreach ($stages as $st) {
+                $stageLeads = $allLeads->where('stage_id', $st->id);
+                $count = $stageLeads->count();
+                $val = $st->isWon()
+                    ? (float) $stageLeads->sum(fn ($l) => (float) ($l->won_amount ?? $l->estimated_value ?? 0))
+                    : (float) $stageLeads->sum('estimated_value');
+                $funnelStages[] = [
+                    'id' => $st->id,
+                    'name' => $st->name,
+                    'color' => $st->color,
+                    'stageType' => $st->stage_type,
+                    'count' => $count,
+                    'share_percent' => $totalLeadsCount > 0 ? round(($count / $totalLeadsCount) * 100, 1) : 0,
+                    'value' => $val,
+                    'formatted_value' => 'Rp ' . number_format($val, 0, ',', '.'),
+                ];
+            }
+
+            $openLeads = $allLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_OPEN);
+            $wonLeads = $allLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_WON);
+            $lostLeads = $allLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_LOST);
+
+            $pipeVal = (float) $openLeads->sum('estimated_value');
+            $wonPipeRev = (float) $wonLeads->sum(fn ($l) => (float) ($l->won_amount ?? $l->estimated_value ?? 0));
+
+            $avgHoursToWin = 0;
+            $wonWithDates = $wonLeads->filter(fn ($l) => $l->won_at && $l->created_at);
+            if ($wonWithDates->isNotEmpty()) {
+                $totalHours = $wonWithDates->sum(fn ($l) => max(0, $l->created_at->diffInMinutes($l->won_at) / 60));
+                $avgHoursToWin = round($totalHours / $wonWithDates->count(), 1);
+            }
+
+            $overdueFollowUps = $openLeads->filter(fn ($l) => $l->next_follow_up_at && $l->next_follow_up_at->isPast())->count();
+
+            $pipelineMetrics = [
+                'total_leads' => $totalLeadsCount,
+                'active_leads_count' => $openLeads->count(),
+                'won_leads_count' => $wonLeads->count(),
+                'lost_leads_count' => $lostLeads->count(),
+                'pipeline_value' => $pipeVal,
+                'formatted_pipeline_value' => 'Rp ' . number_format($pipeVal, 0, ',', '.'),
+                'won_pipeline_revenue' => $wonPipeRev,
+                'formatted_won_pipeline_revenue' => 'Rp ' . number_format($wonPipeRev, 0, ',', '.'),
+                'pipeline_conversion_rate' => $totalLeadsCount > 0 ? round(($wonLeads->count() / $totalLeadsCount) * 100, 1) : 0,
+                'avg_hours_to_win' => $avgHoursToWin,
+                'overdue_follow_ups' => $overdueFollowUps,
+            ];
+
+            $topLostReasons = $lostLeads
+                ->groupBy(fn ($l) => $l->lost_reason ?: 'Lainnya')
+                ->map(fn ($group, $reason) => [
+                    'reason' => $reason,
+                    'count' => $group->count(),
+                    'percent' => $lostLeads->count() > 0 ? round(($group->count() / $lostLeads->count()) * 100, 1) : 0,
+                ])
+                ->sortByDesc('count')
+                ->values()
+                ->take(6)
+                ->all();
+        }
+
         return Inertia::render('Analytics/Index', [
             'metrics' => [
                 'total_chats' => $totalChats,
@@ -136,6 +243,9 @@ class ClosingAnalyticsController extends Controller
             ],
             'csLeaderboard' => $csLeaderboard,
             'recentDeals' => $recentDeals,
+            'funnelStages' => $funnelStages,
+            'pipelineMetrics' => $pipelineMetrics,
+            'topLostReasons' => $topLostReasons,
             'filters' => [
                 'period' => $period,
                 'bu' => $filterBu,

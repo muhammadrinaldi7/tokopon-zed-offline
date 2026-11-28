@@ -90,9 +90,31 @@ export default function Customer360Drawer({
                         </div>
 
                         <div>
-                            <h4 className="text-base font-extrabold text-slate-900">
-                                {customerCrm?.fullName || 'Pelanggan'}
-                            </h4>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <h4 className="text-base font-extrabold text-slate-900">
+                                    {customerCrm?.fullName || 'Pelanggan'}
+                                </h4>
+                                {activeConv?.stageName && (
+                                    <a
+                                        href="/crm/pipeline"
+                                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                                            activeConv.stageType === 'won'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : activeConv.stageType === 'lost'
+                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                        }`}
+                                        title="Buka di papan CRM Sales Pipeline"
+                                    >
+                                        🏷️ {activeConv.stageName}
+                                    </a>
+                                )}
+                            </div>
+                            {activeConv?.nextFollowUpLabel && (
+                                <div className="text-[11px] font-bold text-amber-700 mt-1">
+                                    📅 Jadwal Follow-Up: {activeConv.nextFollowUpLabel}
+                                </div>
+                            )}
                             {customerCrm?.email && (
                                 <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
                                     <Mail className="w-3.5 h-3.5 text-slate-400" />

@@ -184,6 +184,13 @@ class ChatController extends Controller
             }
         }
 
+        // Auto-Create / sinkronkan kartu CRM Lead (tahap New Lead) secara otomatis
+        try {
+            app(\App\Services\CrmPipelineService::class)->syncLeadFromConversation($conversation);
+        } catch (\Throwable $e) {
+            // Jangan gagalkan init chat jika tabel pipeline belum dimigrasi
+        }
+
         // Informasi konteks produk jika ada
         $productInfo = null;
         if ($conversation->product_accurate_id) {

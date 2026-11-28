@@ -243,8 +243,20 @@ export default function ChatSidebar({
                                         {/* Bottom Status Row */}
                                         <div className="flex items-center justify-between mt-1.5 pt-0.5">
                                             <div className="flex items-center gap-1 flex-wrap">
-                                                {/* Closing Status */}
-                                                {conv.closingStatus === 'deal' ? (
+                                                {/* Pipeline Stage / Closing Status */}
+                                                {conv.stageName ? (
+                                                    <span
+                                                        className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold border ${
+                                                            conv.stageType === 'won'
+                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                                : conv.stageType === 'lost'
+                                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                        }`}
+                                                    >
+                                                        {conv.stageName}
+                                                    </span>
+                                                ) : conv.closingStatus === 'deal' ? (
                                                     <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                                         Deal {conv.closingAmount > 0 ? `Rp${conv.closingAmount.toLocaleString('id-ID')}` : ''}
                                                     </span>

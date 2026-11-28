@@ -55,6 +55,15 @@ class XenditWebhookController extends Controller
                 if ($tradeIn && $tradeIn->status === 'PAYING') {
                     $tradeIn->update(['status' => 'COMPLETED']);
                 }
+
+                // Auto-Promote CRM Lead ke WON saat order e-commerce/mobile lunas
+                try {
+                    if ($orderPayment->order) {
+                        app(\App\Services\CrmPipelineService::class)->autoPromoteWonForOrder($orderPayment->order);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('CRM Auto-WON skipped: ' . $e->getMessage());
+                }
             } elseif ($status === 'EXPIRED') {
                 $order = $orderPayment->order;
                 if ($order) {

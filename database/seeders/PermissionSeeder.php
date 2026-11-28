@@ -22,6 +22,9 @@ class PermissionSeeder extends Seeder
             'cek-stock-all-bu',
             'manage-orders',
             'access-cs-chat',
+            'view-crm-pipeline',
+            'view-all-crm-leads',
+            'manage-crm-stages',
 
             // Promo
             'manage-promos',
@@ -88,6 +91,9 @@ class PermissionSeeder extends Seeder
         // Admin gets most operational tasks but not users/settings
         $admin->syncPermissions([
             'access-cs-chat',
+            'view-crm-pipeline',
+            'view-all-crm-leads',
+            'manage-crm-stages',
             'view-pos',
             'view-riwayat-kasir',
             'sell-phone',
@@ -127,6 +133,7 @@ class PermissionSeeder extends Seeder
         // CS gets chat, promo (optional), and stock view
         $cs->syncPermissions([
             'access-cs-chat',
+            'view-crm-pipeline',
             'view-stock',
             'manage-orders',
             'manage-promos'

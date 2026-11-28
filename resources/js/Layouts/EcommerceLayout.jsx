@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import {
     MessageSquare,
+    Kanban,
     TrendingUp,
     Ticket,
     Zap,
@@ -99,6 +100,14 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     badge: 'LIVE',
                     badgeType: 'live',
                     description: 'Pesan & Inbox Pelanggan Realtime',
+                },
+                {
+                    label: 'Sales Pipeline',
+                    href: '/crm/pipeline',
+                    icon: Kanban,
+                    badge: 'CRM',
+                    badgeType: 'promo',
+                    description: 'Kualifikasi Customer sampai WON',
                 },
                 {
                     label: 'Analitik Closing',

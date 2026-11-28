@@ -8,17 +8,21 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendExpoPushNotificationJob;
 use App\Models\BusinessUnit;
 use App\Models\Conversation;
+use App\Models\CrmLead;
+use App\Models\CrmPipelineStage;
 use App\Models\EcommerceCoupon;
 use App\Models\Message;
 use App\Models\Order;
 use App\Models\ProductAccurate;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Services\CrmPipelineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -55,6 +59,7 @@ class CsChatController extends Controller
                 'closedBy',
                 'assignedTo',
                 'businessUnit',
+                'lead.stage',
             ])->find($activeId);
 
             if ($activeConvModel) {
@@ -97,12 +102,32 @@ class CsChatController extends Controller
                 ];
             });
 
+        $pipelineStages = [];
+        if (Schema::hasTable('crm_pipeline_stages')) {
+            app(CrmPipelineService::class)->ensureDefaultStagesExist();
+            $pipelineStages = CrmPipelineStage::where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'slug' => $s->slug,
+                    'color' => $s->color,
+                    'stageType' => $s->stage_type,
+                ])
+                ->values()
+                ->all();
+        }
+
         return Inertia::render('CsChat/Index', [
             'conversations' => $conversations,
             'activeConversation' => $activeConv,
             'messages' => $activeMessages,
             'customerCrm' => $customerCrm,
             'activeCoupons' => $activeCoupons,
+            'pipelineStages' => $pipelineStages,
+            'lostReasons' => CrmLead::LOST_REASONS,
             'filters' => [
                 'tab' => $filterTab,
                 'bu' => $filterBu,
@@ -136,6 +161,7 @@ class CsChatController extends Controller
             'closedBy',
             'businessUnit',
             'assignedTo',
+            'lead.stage',
         ])
         ->withCount([
             'messages as unread_count' => function ($q) {
@@ -256,6 +282,11 @@ class CsChatController extends Controller
                 'lastSender' => $lastSender,
                 'updatedAt' => $conv->updated_at?->diffForHumans() ?? '',
                 'unreadCount' => (int) ($conv->unread_count ?? 0),
+                'leadId' => $conv->lead?->id,
+                'stageId' => $conv->lead?->stage_id,
+                'stageName' => $conv->lead?->stage?->name,
+                'stageColor' => $conv->lead?->stage?->color,
+                'stageType' => $conv->lead?->stage?->stage_type,
             ];
         })->toArray();
     }
@@ -303,6 +334,13 @@ class CsChatController extends Controller
             'isAssignedToMe' => $conv->assigned_to_user_id === Auth::id(),
             'businessUnitId' => $conv->business_unit_id,
             'businessUnitName' => $conv->businessUnit?->name ?? 'Toko Retail',
+            'leadId' => $conv->lead?->id,
+            'stageId' => $conv->lead?->stage_id,
+            'stageName' => $conv->lead?->stage?->name,
+            'stageColor' => $conv->lead?->stage?->color,
+            'stageType' => $conv->lead?->stage?->stage_type,
+            'leadTemperature' => $conv->lead?->temperature,
+            'nextFollowUpLabel' => $conv->lead?->next_follow_up_at?->format('d M Y, H:i'),
             'product' => $conv->productAccurate ? [
                 'id' => $conv->productAccurate->id,
                 'name' => $conv->productAccurate->name,
@@ -548,6 +586,10 @@ class CsChatController extends Controller
             'assigned_at' => now(),
         ]);
 
+        try {
+            app(CrmPipelineService::class)->syncLeadFromConversation($conv, $user->id);
+        } catch (\Throwable $e) {}
+
         return response()->json([
             'success' => true,
             'assignedToName' => $user->name,
@@ -566,6 +608,10 @@ class CsChatController extends Controller
             'assigned_to_user_id' => null,
             'assigned_at' => null,
         ]);
+
+        try {
+            app(CrmPipelineService::class)->syncLeadFromConversation($conv, Auth::id());
+        } catch (\Throwable $e) {}
 
         return response()->json(['success' => true]);
     }
@@ -592,6 +638,26 @@ class CsChatController extends Controller
             'closed_at' => now(),
             'status' => $status === 'deal' ? 'closed' : $conv->status,
         ]);
+
+        // Sinkronkan juga ke tahap CRM Pipeline (deal -> WON, follow_up -> Negosiasi/Follow-Up, lost -> LOST)
+        try {
+            $pipelineService = app(CrmPipelineService::class);
+            $lead = $pipelineService->syncLeadFromConversation($conv, Auth::id());
+            if ($lead) {
+                $targetStage = match ($status) {
+                    'deal' => $pipelineService->getWonStage(),
+                    'lost' => $pipelineService->getLostStage(),
+                    default => $pipelineService->getFollowUpStage(),
+                };
+                $pipelineService->moveLeadToStage($lead, $targetStage, Auth::id(), [
+                    'won_amount' => $status === 'deal' ? (float) ($request->input('amount') ?? 0) : null,
+                    'lost_reason' => $status === 'lost' ? ($request->input('notes') ?: 'Lainnya') : null,
+                    'notes' => $request->input('notes'),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Sync closing to CRM Pipeline skipped: ' . $e->getMessage());
+        }
 
         return response()->json(['success' => true]);
     }

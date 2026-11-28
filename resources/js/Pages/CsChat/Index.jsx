@@ -16,6 +16,8 @@ export default function CsChatIndex({
     messages = [],
     customerCrm = null,
     activeCoupons = [],
+    pipelineStages = [],
+    lostReasons = [],
     filters = {},
     quickReplies = []
 }) {
@@ -25,6 +27,7 @@ export default function CsChatIndex({
     const [activeConv, setActiveConv] = useState(activeConversation);
     const [activeMessages, setActiveMessages] = useState(messages);
     const [activeCrm, setActiveCrm] = useState(customerCrm);
+    const [isUpdatingStage, setIsUpdatingStage] = useState(false);
 
     // Selected product attachment for chat
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -290,18 +293,96 @@ export default function CsChatIndex({
         }
     };
 
+    // Quick Stage Change handler (sinkron langsung ke CRM Pipeline)
+    const handleQuickStageChange = async (stageId) => {
+        if (!activeConv?.id || !stageId) return;
+        const targetStage = pipelineStages.find((s) => Number(s.id) === Number(stageId));
+        if (!targetStage) return;
+
+        // Jika memilih WON / LOST dari dropdown chat, buka modal closing agar nominal/alasan tercatat
+        if (targetStage.stageType === 'won' || targetStage.stageType === 'lost') {
+            setIsClosingModalOpen(true);
+            return;
+        }
+
+        setIsUpdatingStage(true);
+        try {
+            const res = await axios.post(`/crm/chat/${activeConv.id}/stage`, {
+                stage_id: stageId,
+            });
+            if (res.data?.success && res.data.lead) {
+                const updatedLead = res.data.lead;
+                setActiveConv((prev) => ({
+                    ...prev,
+                    leadId: updatedLead.id,
+                    stageId: updatedLead.stageId,
+                    stageName: updatedLead.stageName,
+                    stageColor: updatedLead.stageColor,
+                    stageType: updatedLead.stageType,
+                }));
+                setConvList((prev) =>
+                    prev.map((c) =>
+                        c.id === activeConv.id
+                            ? {
+                                  ...c,
+                                  leadId: updatedLead.id,
+                                  stageId: updatedLead.stageId,
+                                  stageName: updatedLead.stageName,
+                                  stageColor: updatedLead.stageColor,
+                                  stageType: updatedLead.stageType,
+                              }
+                            : c
+                    )
+                );
+            }
+        } catch (e) {
+            console.error('Gagal mengubah tahap kualifikasi:', e);
+            alert('Gagal mengubah tahap kualifikasi: ' + (e.response?.data?.message || e.message));
+        } finally {
+            setIsUpdatingStage(false);
+        }
+    };
+
     // Closing modal success callback
     const handleClosingSuccess = (newStatus, newAmount) => {
+        const matchedStage =
+            newStatus === 'deal'
+                ? pipelineStages.find((s) => s.stageType === 'won')
+                : newStatus === 'lost'
+                ? pipelineStages.find((s) => s.stageType === 'lost')
+                : pipelineStages.find((s) => s.slug === 'negotiation') ||
+                  pipelineStages.find((s) => s.stageType === 'open');
+
         setActiveConv((prev) => ({
             ...prev,
             closingStatus: newStatus,
             closingAmount: newAmount,
+            ...(matchedStage
+                ? {
+                      stageId: matchedStage.id,
+                      stageName: matchedStage.name,
+                      stageColor: matchedStage.color,
+                      stageType: matchedStage.stageType,
+                  }
+                : {}),
         }));
 
         setConvList((prev) =>
             prev.map((c) =>
                 c.id === activeConv?.id
-                    ? { ...c, closingStatus: newStatus, closingAmount: newAmount }
+                    ? {
+                          ...c,
+                          closingStatus: newStatus,
+                          closingAmount: newAmount,
+                          ...(matchedStage
+                              ? {
+                                    stageId: matchedStage.id,
+                                    stageName: matchedStage.name,
+                                    stageColor: matchedStage.color,
+                                    stageType: matchedStage.stageType,
+                                }
+                              : {}),
+                      }
                     : c
             )
         );
@@ -380,6 +461,9 @@ export default function CsChatIndex({
                         onOpenProductPicker={() => setIsProductPickerOpen(true)}
                         onOpenBuybackModal={() => setIsBuybackModalOpen(true)}
                         onClaimToggle={handleClaimToggle}
+                        pipelineStages={pipelineStages}
+                        onQuickStageChange={handleQuickStageChange}
+                        isUpdatingStage={isUpdatingStage}
                         selectedProduct={selectedProduct}
                         onRemoveProduct={() => setSelectedProduct(null)}
                         onNewMessageSent={handleNewMessageSent}

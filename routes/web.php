@@ -112,7 +112,22 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/chat/{conversation}/claim', [\App\Http\Controllers\Crm\CsChatController::class, 'claim'])->name('chat.claim');
         Route::post('/chat/{conversation}/release', [\App\Http\Controllers\Crm\CsChatController::class, 'release'])->name('chat.release');
         Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
+        Route::post('/chat/{conversation}/stage', [\App\Http\Controllers\Crm\PipelineController::class, 'moveByConversation'])->name('chat.stage');
         Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
+
+        // ─── Sub-Modul: CRM Sales Pipeline (Kualifikasi Customer sampai WON) ───
+        Route::get('/pipeline', [\App\Http\Controllers\Crm\PipelineController::class, 'index'])->name('pipeline');
+        Route::post('/pipeline/leads', [\App\Http\Controllers\Crm\PipelineController::class, 'store'])->name('pipeline.leads.store');
+        Route::put('/pipeline/leads/{lead}', [\App\Http\Controllers\Crm\PipelineController::class, 'update'])->name('pipeline.leads.update');
+        Route::post('/pipeline/leads/{lead}/stage', [\App\Http\Controllers\Crm\PipelineController::class, 'moveStage'])->name('pipeline.leads.stage');
+        Route::post('/pipeline/leads/{lead}/activities', [\App\Http\Controllers\Crm\PipelineController::class, 'addActivity'])->name('pipeline.leads.activities');
+        Route::delete('/pipeline/leads/{lead}', [\App\Http\Controllers\Crm\PipelineController::class, 'destroy'])->name('pipeline.leads.destroy');
+        Route::post('/pipeline/sync-conversations', [\App\Http\Controllers\Crm\PipelineController::class, 'syncConversations'])->name('pipeline.sync');
+        Route::get('/pipeline/export', [\App\Http\Controllers\Crm\PipelineController::class, 'exportCsv'])->name('pipeline.export');
+        Route::post('/pipeline/stages', [\App\Http\Controllers\Crm\PipelineController::class, 'storeStage'])->name('pipeline.stages.store');
+        Route::put('/pipeline/stages/{stage}', [\App\Http\Controllers\Crm\PipelineController::class, 'updateStage'])->name('pipeline.stages.update');
+        Route::post('/pipeline/stages/reorder', [\App\Http\Controllers\Crm\PipelineController::class, 'reorderStages'])->name('pipeline.stages.reorder');
+        Route::delete('/pipeline/stages/{stage}', [\App\Http\Controllers\Crm\PipelineController::class, 'destroyStage'])->name('pipeline.stages.destroy');
         Route::get('/chat/search-products', [\App\Http\Controllers\Crm\CsChatController::class, 'searchProducts'])->name('chat.search-products');
         Route::get('/chat/buyback/filter-options', [\App\Http\Controllers\Crm\BuybackSimulatorController::class, 'getFilterOptions'])->name('chat.buyback.filters');
         Route::get('/chat/buyback/search-devices', [\App\Http\Controllers\Crm\BuybackSimulatorController::class, 'searchDevices'])->name('chat.buyback.search');

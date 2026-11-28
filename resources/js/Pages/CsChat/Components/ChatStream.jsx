@@ -34,6 +34,9 @@ export default function ChatStream({
     onOpenProductPicker,
     onOpenBuybackModal,
     onClaimToggle,
+    pipelineStages = [],
+    onQuickStageChange,
+    isUpdatingStage = false,
     selectedProduct,
     onRemoveProduct,
     onNewMessageSent
@@ -199,7 +202,35 @@ export default function ChatStream({
                 </div>
 
                 {/* Header Action Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {/* Quick CRM Pipeline Stage Selector */}
+                    {pipelineStages.length > 0 && onQuickStageChange && (
+                        <select
+                            value={activeConv.stageId || ''}
+                            disabled={isUpdatingStage}
+                            onChange={(e) => {
+                                if (e.target.value) {
+                                    onQuickStageChange(Number(e.target.value));
+                                }
+                            }}
+                            title="Ubah tahap kualifikasi customer di CRM Pipeline"
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border outline-none cursor-pointer transition-all ${
+                                activeConv.stageType === 'won'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : activeConv.stageType === 'lost'
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                    : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+                            }`}
+                        >
+                            {!activeConv.stageId && <option value="">🏷️ Kualifikasi...</option>}
+                            {pipelineStages.map((st) => (
+                                <option key={st.id} value={st.id}>
+                                    🏷️ {st.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
                     {/* CS Claim / Release toggle */}
                     <button
                         type="button"
