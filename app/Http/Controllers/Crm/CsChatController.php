@@ -649,7 +649,7 @@ class CsChatController extends Controller
     }
 
     /**
-     * Simpan status Closing Deal
+     * Simpan status Closing Deal (dilengkapi proteksi anti-double-closing & deteksi duplikat identik)
      */
     public function saveClosing(Request $request, int $conversationId): JsonResponse
     {
@@ -657,36 +657,95 @@ class CsChatController extends Controller
             'status' => 'required|in:deal,follow_up,lost',
             'amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:1000',
+            'force_duplicate' => 'nullable|boolean',
         ]);
 
         $conv = Conversation::findOrFail($conversationId);
         $status = $request->input('status');
+        $amount = (float) ($request->input('amount') ?? 0);
+        $notes = trim((string) ($request->input('notes') ?? ''));
+        $forceDuplicate = $request->boolean('force_duplicate');
+
+        $pipelineService = app(CrmPipelineService::class);
+        $openLead = null;
+
+        if (Schema::hasTable('crm_leads') && Schema::hasTable('crm_pipeline_stages')) {
+            $pipelineService->ensureDefaultStagesExist();
+
+            // Lapis 1: Wajib ada peluang aktif (open) jika percakapan sudah pernah memiliki lead
+            $openLead = $pipelineService->findActiveOpenLeadForConversation($conv->id);
+            if (!$openLead) {
+                $latestLead = CrmLead::with('stage')
+                    ->where('conversation_id', $conv->id)
+                    ->latest('id')
+                    ->first();
+
+                if ($latestLead && $latestLead->stage && ($latestLead->stage->isWon() || $latestLead->stage->isLost())) {
+                    return response()->json([
+                        'success' => false,
+                        'code' => 'ALREADY_CLOSED',
+                        'message' => "Transaksi terakhir pada percakapan ini sudah berstatus {$latestLead->stage->name}. Klik tombol '+ Transaksi Baru' terlebih dahulu jika pelanggan melakukan pembelian baru.",
+                    ], 409);
+                }
+
+                // Percakapan lama yg belum punya lead sama sekali -> inisialisasi 1 lead pertama
+                $openLead = $pipelineService->syncLeadFromConversation($conv, Auth::id());
+            }
+
+            // Lapis 2: Deteksi duplikat identik (nominal + catatan sama persis dalam 10 menit terakhir)
+            if ($status === 'deal' && !$forceDuplicate) {
+                $wonStageIds = CrmPipelineStage::where('stage_type', CrmPipelineStage::TYPE_WON)->pluck('id');
+                $recentIdentical = CrmLead::with('wonBy:id,name')
+                    ->where('conversation_id', $conv->id)
+                    ->whereIn('stage_id', $wonStageIds)
+                    ->where('won_at', '>=', now()->subMinutes(10))
+                    ->get()
+                    ->first(function (CrmLead $existing) use ($amount, $notes) {
+                        $sameAmount = abs((float) ($existing->won_amount ?? 0) - $amount) < 0.01;
+                        $sameNotes = mb_strtolower(trim((string) ($existing->notes ?? ''))) === mb_strtolower($notes);
+                        return $sameAmount && $sameNotes;
+                    });
+
+                if ($recentIdentical) {
+                    $closerName = $recentIdentical->wonBy?->name ?? 'CS';
+                    $wonTime = $recentIdentical->won_at?->format('H:i') ?? 'baru saja';
+                    return response()->json([
+                        'success' => false,
+                        'code' => 'DUPLICATE_CLOSING',
+                        'message' => sprintf(
+                            'Terdeteksi closing dengan nominal (Rp %s) dan catatan yang sama persis sudah dicatat pukul %s oleh %s. Yakin ini transaksi unit berbeda?',
+                            number_format($amount, 0, ',', '.'),
+                            $wonTime,
+                            $closerName
+                        ),
+                    ], 409);
+                }
+            }
+        }
 
         $conv->update([
             'closing_status' => $status,
-            'closing_amount' => $request->input('amount'),
-            'closing_notes' => $request->input('notes'),
+            'closing_amount' => $amount,
+            'closing_notes' => $notes !== '' ? $notes : null,
             'closed_by_user_id' => Auth::id(),
             'closed_at' => now(),
             'status' => $status === 'deal' ? 'closed' : $conv->status,
         ]);
 
-        // Sinkronkan ke CRM Pipeline (Multi-Closing: jika lead lama sudah WON/LOST, otomatis buat kartu baru agar transaksi lama tidak tertimpa!)
+        // Sinkronkan ke lead aktif (openLead)
         $createdOrUpdatedLead = null;
         try {
-            $pipelineService = app(CrmPipelineService::class);
-            $lead = $pipelineService->syncLeadFromConversation($conv, Auth::id(), false, true);
-            if ($lead) {
+            if ($openLead) {
                 $targetStage = match ($status) {
                     'deal' => $pipelineService->getWonStage(),
                     'lost' => $pipelineService->getLostStage(),
                     default => $pipelineService->getFollowUpStage(),
                 };
-                $createdOrUpdatedLead = $pipelineService->moveLeadToStage($lead, $targetStage, Auth::id(), [
-                    'won_amount' => $status === 'deal' ? (float) ($request->input('amount') ?? 0) : null,
+                $createdOrUpdatedLead = $pipelineService->moveLeadToStage($openLead, $targetStage, Auth::id(), [
+                    'won_amount' => $status === 'deal' ? $amount : null,
                     'won_by_user_id' => $status === 'deal' ? Auth::id() : null,
-                    'lost_reason' => $status === 'lost' ? ($request->input('notes') ?: 'Lainnya') : null,
-                    'notes' => $request->input('notes'),
+                    'lost_reason' => $status === 'lost' ? ($notes ?: 'Lainnya') : null,
+                    'notes' => $notes !== '' ? $notes : null,
                 ]);
             }
         } catch (\Throwable $e) {
@@ -700,8 +759,15 @@ class CsChatController extends Controller
         $wonLeads = $allConvLeads->filter(fn ($l) => $l->stage?->stage_type === CrmPipelineStage::TYPE_WON);
         $totalWonAmount = (float) $wonLeads->sum(fn ($l) => (float) ($l->won_amount ?? $l->estimated_value ?? 0));
 
+        $successMsg = match ($status) {
+            'deal' => 'Closing WON berhasil dicatat (Rp ' . number_format($amount, 0, ',', '.') . ') atas nama ' . (Auth::user()?->name ?? 'Anda') . '!',
+            'lost' => 'Status percakapan ditandai Batal (LOST).',
+            default => 'Status percakapan diperbarui ke Follow Up.',
+        };
+
         return response()->json([
             'success' => true,
+            'message' => $successMsg,
             'leadId' => $createdOrUpdatedLead?->id,
             'wonCount' => $wonLeads->count(),
             'totalWonAmount' => $totalWonAmount,

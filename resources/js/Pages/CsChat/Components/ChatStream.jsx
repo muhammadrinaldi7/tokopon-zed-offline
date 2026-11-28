@@ -295,15 +295,39 @@ export default function ChatStream({
                         <span>Detail CRM</span>
                     </button>
 
-                    {/* Tag Closing Button */}
-                    <button
-                        type="button"
-                        onClick={onOpenClosingModal}
-                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all"
-                    >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Closing Deal</span>
-                    </button>
+                    {/* Tag Closing Button (Terkunci jika transaksi saat ini sudah WON/LOST agar tidak double-closing) */}
+                    {activeConv.stageType === 'won' ? (
+                        <button
+                            type="button"
+                            onClick={onCreateNewDeal}
+                            disabled={isUpdatingStage}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black flex items-center gap-1.5 transition-all"
+                            title="Transaksi saat ini sudah WON. Klik untuk membuka peluang transaksi baru jika customer membeli lagi."
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Sudah WON</span>
+                        </button>
+                    ) : activeConv.stageType === 'lost' ? (
+                        <button
+                            type="button"
+                            onClick={onCreateNewDeal}
+                            disabled={isUpdatingStage}
+                            className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black flex items-center gap-1.5 transition-all"
+                            title="Transaksi sebelumnya LOST. Klik untuk membuka peluang transaksi baru."
+                        >
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Sudah LOST</span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={onOpenClosingModal}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all"
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Closing Deal</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

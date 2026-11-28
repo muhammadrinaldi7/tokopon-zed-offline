@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     X,
     CheckCircle2,
     Clock,
     XCircle,
     DollarSign,
-    Loader2
+    Loader2,
+    AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -15,39 +16,62 @@ export default function ClosingModal({
     activeConv,
     onClosingSuccess
 }) {
+    const [status, setStatus] = useState('deal');
+    const [amount, setAmount] = useState('');
+    const [notes, setNotes] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+    const [duplicateWarning, setDuplicateWarning] = useState('');
+
+    // Selalu reset form ke kondisi bersih setiap kali modal dibuka untuk transaksi baru
+    useEffect(() => {
+        if (isOpen) {
+            setStatus('deal');
+            setAmount('');
+            setNotes('');
+            setErrorMsg('');
+            setDuplicateWarning('');
+        }
+    }, [isOpen, activeConv?.id, activeConv?.leadId]);
+
     if (!isOpen || !activeConv) return null;
 
-    const [status, setStatus] = useState(
-        ['deal', 'follow_up', 'lost'].includes(activeConv.closingStatus)
-            ? activeConv.closingStatus
-            : 'deal'
-    );
-    const [amount, setAmount] = useState(
-        activeConv.closingAmount ? String(activeConv.closingAmount) : ''
-    );
-    const [notes, setNotes] = useState(activeConv.closingNotes || '');
-    const [isSaving, setIsSaving] = useState(false);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const submitClosing = async (forceDuplicate = false) => {
         setIsSaving(true);
+        setErrorMsg('');
+        if (!forceDuplicate) {
+            setDuplicateWarning('');
+        }
 
         try {
+            const numericAmount = amount ? parseFloat(String(amount).replace(/[^0-9]/g, '')) : 0;
             const res = await axios.post(`/crm/chat/${activeConv.id}/closing`, {
                 status,
-                amount: amount ? parseFloat(amount.replace(/[^0-9]/g, '')) : 0,
+                amount: numericAmount,
                 notes,
+                force_duplicate: forceDuplicate,
             });
 
             if (res.data?.success) {
-                onClosingSuccess(status, amount, res.data);
+                onClosingSuccess(status, numericAmount, res.data);
                 onClose();
             }
         } catch (err) {
-            console.error('Gagal menyimpan status closing:', err);
+            const code = err.response?.data?.code;
+            const msg = err.response?.data?.message || 'Gagal menyimpan status closing.';
+            if (code === 'DUPLICATE_CLOSING') {
+                setDuplicateWarning(msg);
+            } else {
+                setErrorMsg(msg);
+            }
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        await submitClosing(false);
     };
 
     return (
@@ -84,6 +108,39 @@ export default function ClosingModal({
                             <strong>Multi-Closing Aktif:</strong> Customer ini sudah memiliki{' '}
                             <strong>{activeConv.wonCount} transaksi WON</strong> ({activeConv.formattedTotalWonAmount || ''}).
                             Menyimpan Deal baru akan tercatat sebagai <strong>transaksi terpisah</strong> atas nama Anda tanpa menimpa closing sebelumnya.
+                        </div>
+                    )}
+
+                    {errorMsg && (
+                        <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <span>{errorMsg}</span>
+                        </div>
+                    )}
+
+                    {duplicateWarning && (
+                        <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-900 space-y-2.5">
+                            <div className="flex items-start gap-2 font-semibold">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <span>{duplicateWarning}</span>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setDuplicateWarning('')}
+                                    className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-[11px] font-bold"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isSaving}
+                                    onClick={() => submitClosing(true)}
+                                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold"
+                                >
+                                    Ya, Ini Transaksi Berbeda — Tetap Simpan
+                                </button>
+                            </div>
                         </div>
                     )}
 

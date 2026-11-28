@@ -28,6 +28,12 @@ export default function CsChatIndex({
     const [activeMessages, setActiveMessages] = useState(messages);
     const [activeCrm, setActiveCrm] = useState(customerCrm);
     const [isUpdatingStage, setIsUpdatingStage] = useState(false);
+    const [chatToast, setChatToast] = useState(null);
+
+    const showChatToast = (message, tone = 'success') => {
+        setChatToast({ message, tone });
+        setTimeout(() => setChatToast(null), 4000);
+    };
 
     // Selected product attachment for chat
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -299,6 +305,15 @@ export default function CsChatIndex({
         const targetStage = pipelineStages.find((s) => Number(s.id) === Number(stageId));
         if (!targetStage) return;
 
+        // Jika transaksi terakhir sudah WON/LOST, arahkan CS membuka transaksi baru dulu agar tidak menimpa/double-closing
+        if (activeConv.stageType === 'won' || activeConv.stageType === 'lost') {
+            showChatToast(
+                `Transaksi saat ini sudah ${activeConv.stageName || activeConv.stageType.toUpperCase()}. Klik '+ Transaksi Baru' dulu untuk mencatat pembelian baru.`,
+                'info'
+            );
+            return;
+        }
+
         // Jika memilih WON / LOST dari dropdown chat, buka modal closing agar nominal/alasan tercatat
         if (targetStage.stageType === 'won' || targetStage.stageType === 'lost') {
             setIsClosingModalOpen(true);
@@ -334,6 +349,7 @@ export default function CsChatIndex({
                             : c
                     )
                 );
+                showChatToast(`🏷️ Kualifikasi diubah ke "${updatedLead.stageName}"`);
             }
         } catch (e) {
             console.error('Gagal mengubah tahap kualifikasi:', e);
@@ -378,6 +394,7 @@ export default function CsChatIndex({
                             : c
                     )
                 );
+                showChatToast('✨ Transaksi baru dibuka! Silakan lanjutkan kualifikasi atau klik Closing Deal.');
             }
         } catch (e) {
             alert('Gagal membuka transaksi baru: ' + (e.response?.data?.message || e.message));
@@ -437,6 +454,13 @@ export default function CsChatIndex({
                     : c
             )
         );
+
+        showChatToast(
+            responseData?.message ||
+                (newStatus === 'deal'
+                    ? `🎉 Closing berhasil dicatat (Rp ${Number(newAmount || 0).toLocaleString('id-ID')})!`
+                    : 'Status closing berhasil diperbarui.')
+        );
     };
 
     // Callback saat pesan baru berhasil terkirim via ChatStream
@@ -487,6 +511,16 @@ export default function CsChatIndex({
     return (
         <EcommerceLayout title="Live Chat CS & CRM Suite">
             <Head title="Live Chat CS & CRM" />
+
+            {chatToast && (
+                <div
+                    className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs font-bold text-white flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 ${
+                        chatToast.tone === 'info' ? 'bg-indigo-700' : 'bg-slate-900'
+                    }`}
+                >
+                    <span>{chatToast.message}</span>
+                </div>
+            )}
 
             <div className="flex h-full w-full overflow-hidden relative">
                 {/* 1. Sidebar Antrean Chat (Kiri) */}
