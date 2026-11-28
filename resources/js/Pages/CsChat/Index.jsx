@@ -247,8 +247,15 @@ export default function CsChatIndex({
     }, [activeConv?.id]);
 
     // Claim / Release handler
-    const handleClaimToggle = async (action) => {
+    const handleClaimToggle = async (actionArg) => {
         if (!activeConv?.id) return;
+
+        const action =
+            actionArg === 'claim' || actionArg === 'release'
+                ? actionArg
+                : activeConv.isAssignedToMe
+                ? 'release'
+                : 'claim';
 
         try {
             const res = await axios.post(`/crm/chat/${activeConv.id}/${action}`);

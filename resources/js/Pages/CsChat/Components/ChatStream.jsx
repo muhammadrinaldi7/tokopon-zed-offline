@@ -203,7 +203,7 @@ export default function ChatStream({
                     {/* CS Claim / Release toggle */}
                     <button
                         type="button"
-                        onClick={onClaimToggle}
+                        onClick={() => onClaimToggle?.(activeConv.isAssignedToMe ? 'release' : 'claim')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 ${
                             !activeConv.assignedToId
                                 ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
