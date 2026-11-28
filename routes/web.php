@@ -112,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/chat/{conversation}/claim', [\App\Http\Controllers\Crm\CsChatController::class, 'claim'])->name('chat.claim');
         Route::post('/chat/{conversation}/release', [\App\Http\Controllers\Crm\CsChatController::class, 'release'])->name('chat.release');
         Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
+        Route::post('/chat/{conversation}/notes', [\App\Http\Controllers\Crm\CsChatController::class, 'saveNotes'])->name('chat.notes');
         Route::post('/chat/{conversation}/stage', [\App\Http\Controllers\Crm\PipelineController::class, 'moveByConversation'])->name('chat.stage');
         Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
 

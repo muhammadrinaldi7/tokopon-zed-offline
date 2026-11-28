@@ -476,6 +476,9 @@ export default function CsChatIndex({
                     onClose={() => setIsCrmDrawerOpen(false)}
                     customerCrm={activeCrm}
                     activeConv={activeConv}
+                    onNotesSaved={(savedNotes) => {
+                        setActiveConv((prev) => (prev ? { ...prev, closingNotes: savedNotes } : prev));
+                    }}
                 />
 
                 {/* 4. Quick Voucher Modal */}

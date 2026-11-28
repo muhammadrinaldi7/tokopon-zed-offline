@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import {
     X,
     User,
@@ -13,21 +14,56 @@ import {
     MessageCircle,
     Calendar,
     ChevronRight,
-    ExternalLink
+    ExternalLink,
+    Save,
+    Loader2
 } from 'lucide-react';
 
 export default function Customer360Drawer({
     isOpen,
     onClose,
     customerCrm,
-    activeConv
+    activeConv,
+    onNotesSaved
 }) {
-    if (!isOpen) return null;
-
     const [copiedPhone, setCopiedPhone] = useState(false);
     const [internalNotes, setInternalNotes] = useState(activeConv?.closingNotes || '');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
     const [noteSaved, setNoteSaved] = useState(false);
+    const [noteError, setNoteError] = useState('');
+
+    // Sinkronkan isi catatan setiap kali berpindah percakapan atau drawer dibuka
+    useEffect(() => {
+        setInternalNotes(activeConv?.closingNotes || '');
+        setNoteSaved(false);
+        setNoteError('');
+    }, [activeConv?.id, activeConv?.closingNotes, isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleSaveNotes = async () => {
+        if (!activeConv?.id || isSavingNotes) return;
+        setIsSavingNotes(true);
+        setNoteError('');
+        setNoteSaved(false);
+        try {
+            const res = await axios.post(`/crm/chat/${activeConv.id}/notes`, {
+                notes: internalNotes,
+            });
+            if (res.data?.success) {
+                setNoteSaved(true);
+                if (onNotesSaved) {
+                    onNotesSaved(res.data.notes ?? internalNotes);
+                }
+                setTimeout(() => setNoteSaved(false), 3000);
+            }
+        } catch (err) {
+            console.error('Gagal menyimpan catatan CRM internal:', err);
+            setNoteError(err.response?.data?.message || 'Gagal menyimpan catatan. Coba lagi.');
+        } finally {
+            setIsSavingNotes(false);
+        }
+    };
 
     const handleCopyPhone = () => {
         if (customerCrm?.phone) {
@@ -283,10 +319,34 @@ export default function Customer360Drawer({
                         <textarea
                             rows={3}
                             value={internalNotes}
-                            onChange={(e) => setInternalNotes(e.target.value)}
+                            onChange={(e) => {
+                                setInternalNotes(e.target.value);
+                                if (noteSaved) setNoteSaved(false);
+                            }}
                             placeholder="Contoh: Customer langganan toko Veteran, minta bonus temper glass..."
                             className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                         />
+                        {noteError && (
+                            <p className="text-[11px] font-semibold text-rose-600">{noteError}</p>
+                        )}
+                        <div className="flex items-center justify-between pt-1">
+                            <span className="text-[11px] font-bold text-emerald-600">
+                                {noteSaved ? '✓ Catatan tersimpan & sinkron ke Pipeline' : ''}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleSaveNotes}
+                                disabled={isSavingNotes || !activeConv?.id}
+                                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+                            >
+                                {isSavingNotes ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <Save className="w-3.5 h-3.5" />
+                                )}
+                                <span>{isSavingNotes ? 'Menyimpan...' : 'Simpan Catatan'}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

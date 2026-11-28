@@ -663,6 +663,47 @@ class CsChatController extends Controller
     }
 
     /**
+     * Simpan Catatan CRM Internal pada percakapan & sinkronkan ke CRM Pipeline Lead
+     */
+    public function saveNotes(Request $request, int $conversationId): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $notes = trim((string) ($validated['notes'] ?? ''));
+        $conv = Conversation::findOrFail($conversationId);
+        $conv->update([
+            'closing_notes' => $notes !== '' ? $notes : null,
+        ]);
+
+        // Sinkronkan juga ke kartu CRM Pipeline & catat riwayat aktivitas jika catatan tidak kosong
+        try {
+            $pipelineService = app(CrmPipelineService::class);
+            $lead = $pipelineService->syncLeadFromConversation($conv, Auth::id());
+            if ($lead) {
+                $lead->update(['notes' => $notes !== '' ? $notes : null]);
+                if ($notes !== '') {
+                    \App\Models\CrmLeadActivity::create([
+                        'lead_id' => $lead->id,
+                        'actor_user_id' => Auth::id(),
+                        'activity_type' => 'note',
+                        'description' => "Catatan CRM Internal: {$notes}",
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Sync notes to CRM Pipeline skipped: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'notes' => $conv->closing_notes ?? '',
+            'message' => 'Catatan CRM internal berhasil disimpan.',
+        ]);
+    }
+
+    /**
      * Quick Voucher Generator: Buat kupon khusus closing deal di chat
      */
     public function generateQuickVoucher(Request $request): JsonResponse
